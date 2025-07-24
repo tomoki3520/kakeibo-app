@@ -230,6 +230,7 @@
       padding: 0.8em;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      position: relative; /* monthPickerを絶対配置するため */
     }
 
     .month-navigation button {
@@ -245,6 +246,8 @@
       font-size: 1.3em;
       font-weight: bold;
       color: #2c3e50;
+      cursor: pointer; /* クリックできることを示す */
+      text-decoration: underline; /* クリックできることを示す */
     }
 
     .summary-section {
@@ -553,10 +556,7 @@
   <div class="month-navigation">
     <button id="prevMonth">&lt;</button>
     <span id="currentMonthDisplay" class="month-display"></span>
-    <div style="display: flex; gap: 5px;">
-        <select id="selectYear" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;"></select>
-        <select id="selectMonth" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;"></select>
-    </div>
+    <input type="month" id="monthPicker" style="visibility: hidden; position: absolute; width: 1px; height: 1px;">
     <button id="nextMonth">&gt;</button>
   </div>
 
@@ -678,10 +678,8 @@
     const csvFileInput = document.getElementById("csvFileInput");
     const importCsvBtn = document.getElementById("importCsvBtn");
 
-    // ここから追加
-    const selectYear = document.getElementById("selectYear");
-    const selectMonth = document.getElementById("selectMonth");
-    // ここまで追加
+    // ここを変更: selectYear, selectMonthは削除し、monthPickerを追加
+    const monthPicker = document.getElementById("monthPicker");
 
     // 固定支出関連のDOM要素
     const fixedExpenseCategorySelect = document.getElementById("fixedExpenseCategory");
@@ -1043,67 +1041,35 @@
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1; // getMonth()は0から始まるため+1
       currentMonthDisplay.textContent = `${year}年${month}月`;
-
-      // ドロップダウンを現在の月に合わせる
-      selectYear.value = year;
-      selectMonth.value = month;
+      // monthPickerの値を現在の月に合わせる (YYYY-MM形式)
+      monthPicker.value = `${year}-${month.toString().padStart(2, '0')}`;
     }
+
+    // currentMonthDisplayをクリックしたらmonthPickerを表示するイベントリスナー
+    currentMonthDisplay.addEventListener('click', () => {
+        monthPicker.click(); // 非表示のinputをプログラムからクリックしてネイティブピッカーを表示
+    });
+
+    // monthPickerの値が変更されたらcurrentMonthを更新し、データを再読み込み
+    monthPicker.addEventListener('change', async () => {
+        const [year, month] = monthPicker.value.split('-').map(Number);
+        currentMonth.setFullYear(year, month - 1, 1); // 月は0始まりなので-1
+        await loadAndDisplayData();
+        updateMonthDisplay(); // 表示を更新
+    });
 
     prevMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() - 1);
       await loadAndDisplayData();
-      updateMonthDropdowns(); // ドロップダウンも更新
+      updateMonthDisplay(); // 月表示（2025年7月）も更新
     });
 
     nextMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() + 1);
       await loadAndDisplayData();
-      updateMonthDropdowns(); // ドロップダウンも更新
+      updateMonthDisplay(); // 月表示（2025年7月）も更新
     });
 
-    // ここから追加
-    // ドロップダウンリストに年と月を生成する関数
-    async function populateMonthDropdowns() {
-        // 現在から過去5年、未来1年分の年を選択肢に入れる
-        const currentYear = new Date().getFullYear();
-        for (let i = currentYear - 5; i <= currentYear + 1; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = `${i}年`;
-            selectYear.appendChild(option);
-        }
-
-        // 1月から12月までを選択肢に入れる
-        for (let i = 1; i <= 12; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = `${i}月`;
-            selectMonth.appendChild(option);
-        }
-
-        // 初期表示を現在の月に合わせる
-        updateMonthDropdowns();
-
-        // ドロップダウンが変更されたときのイベントリスナー
-        selectYear.addEventListener('change', async () => {
-            currentMonth.setFullYear(parseInt(selectYear.value));
-            await loadAndDisplayData();
-            updateMonthDisplay(); // 月表示（2025年7月）を更新
-        });
-
-        selectMonth.addEventListener('change', async () => {
-            currentMonth.setMonth(parseInt(selectMonth.value) - 1); // getMonth()は0始まりのため-1
-            await loadAndDisplayData();
-            updateMonthDisplay(); // 月表示（2025年7月）を更新
-        });
-    }
-
-    // ドロップダウンの選択をcurrentMonthに合わせる関数
-    function updateMonthDropdowns() {
-        selectYear.value = currentMonth.getFullYear();
-        selectMonth.value = currentMonth.getMonth() + 1;
-    }
-    // ここまで追加
 
     function updateSummary(data) {
       let totalIncome = 0;
@@ -1787,7 +1753,7 @@
       await renderBudgetList();
       await loadAndDisplayData();
       updateCharts(await filterAndSortMonthlyData());
-      await populateMonthDropdowns(); // ドロップダウンを初期化
+      updateMonthDisplay(); // monthPickerの値を初期化
     }
 
     // ページロード時に初期化
