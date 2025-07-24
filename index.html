@@ -693,7 +693,7 @@
         "税金・年金", "その他"
       ],
       "収入": [
-        "給与", "副業", "お小遣い", "配当・投資", "その他"
+        "給与", "副業", "お小遣い", "配当・投資", "賞与", "その他" // ここに「賞与」を追加
       ]
     };
 
@@ -707,7 +707,53 @@
     document.getElementById("date").valueAsDate = new Date();
     typeSelect.addEventListener("change", updateCategoryOptions);
 
-    form.addEventListener("submit", (e) => {
+    // IndexedDBの変数とデータベースオープン関数
+    let db;
+    const DB_NAME = 'kakeiboDB';
+    const DB_VERSION = 1;
+    const STORE_NAMES = {
+        ENTRIES: 'entries',
+        FIXED_EXPENSES: 'fixedExpenses',
+        BUDGETS: 'budgets'
+    };
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAMES.ENTRIES)) {
+                    const entriesStore = db.createObjectStore(STORE_NAMES.ENTRIES, { keyPath: 'id', autoIncrement: true });
+                    entriesStore.createIndex('date', 'date', { unique: false });
+                    entriesStore.createIndex('type', 'type', { unique: false });
+                    entriesStore.createIndex('category', 'category', { unique: false });
+                    entriesStore.createIndex('note', 'note', { unique: false });
+                    entriesStore.createIndex('tags', 'tags', { unique: false });
+                }
+                if (!db.objectStoreNames.contains(STORE_NAMES.FIXED_EXPENSES)) {
+                    db.createObjectStore(STORE_NAMES.FIXED_EXPENSES, { keyPath: 'id', autoIncrement: true });
+                }
+                if (!db.objectStoreNames.contains(STORE_NAMES.BUDGETS)) {
+                    db.createObjectStore(STORE_NAMES.BUDGETS, { keyPath: 'category' });
+                }
+                console.log('IndexedDB upgraded or created successfully.');
+            };
+
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                console.log('IndexedDB opened successfully.');
+                resolve(db);
+            };
+
+            request.onerror = (event) => {
+                console.error('IndexedDB error:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
+    }
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const data = {
@@ -716,7 +762,7 @@
         category: categorySelect.value,
         amount: parseInt(amountInput.value, 10),
         note: noteInput.value,
-        tags: tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag !== '') // カンマ区切りで配列に
+        tags: tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag !== '')
       };
 
       if (!data.type || !data.date || !data.category || isNaN(data.amount) || data.amount <= 0) {
@@ -724,28 +770,24 @@
         return;
       }
 
-      // 「その他」カテゴリが選択され、かつメモが入力されている場合は、そのメモをカスタムカテゴリとして記憶
       if (data.category === "その他" && data.note) {
           customCategories.add(data.note);
       }
-      // メモの内容を記憶
       if (data.note) {
           pastNotes.add(data.note);
       }
 
-
-      saveData(data);
-      loadAndDisplayData();
+      await saveData(data);
+      await loadAndDisplayData();
       form.reset();
-      updateCategoryOptions(); // カテゴリ選択肢をリセット
-      updateMemoSuggestions(); // メモ候補を更新
+      updateCategoryOptions();
+      updateMemoSuggestions();
     });
 
     function updateCategoryOptions() {
       const type = typeSelect.value;
-      categorySelect.innerHTML = '<option value="">選択してください</option>'; // 初期オプション
+      categorySelect.innerHTML = '<option value="">選択してください</option>';
 
-      // 通常のカテゴリを追加
       if (categoryOptions[type]) {
         categoryOptions[type].forEach(cat => {
           const opt = document.createElement("option");
@@ -757,21 +799,18 @@
         categorySelect.innerHTML = '<option value="">まず種別を選んでください</option>';
       }
 
-      // カスタムカテゴリを追加（「その他」カテゴリの場合のみ）
-      if (type === "支出") { // カスタムカテゴリは支出のみを想定
+      if (type === "支出") {
           customCategories.forEach(cat => {
-              // 既存のカテゴリと重複しないようにチェック
               if (!categoryOptions["支出"].includes(cat)) {
                   const opt = document.createElement("option");
                   opt.value = cat;
-                  opt.textContent = `その他 (${cat})`; // 識別しやすいように
+                  opt.textContent = `その他 (${cat})`;
                   categorySelect.appendChild(opt);
               }
           });
       }
     }
 
-    // メモ入力候補の更新
     function updateMemoSuggestions() {
         memoSuggestionsDatalist.innerHTML = '';
         pastNotes.forEach(note => {
@@ -781,15 +820,60 @@
         });
     }
 
-    function saveData(data) {
-      const existing = JSON.parse(localStorage.getItem("kakeibo")) || [];
-      existing.push(data);
-      localStorage.setItem("kakeibo", JSON.stringify(existing));
+    /**
+     * 家計簿データをIndexedDBに保存する関数
+     * @param {object} data 保存する家計簿エントリ
+     */
+    async function saveData(data) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.ENTRIES], 'readwrite');
+            const store = transaction.objectStore(STORE_NAMES.ENTRIES);
+
+            const request = store.put(data);
+
+            request.onsuccess = () => {
+                console.log('Data saved to IndexedDB:', data);
+                resolve();
+            };
+
+            request.onerror = (event) => {
+                console.error('Error saving data to IndexedDB:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
     }
 
-    // 全ての家計簿データをロードし、カスタムカテゴリとメモ候補を更新
-    function loadAllDataForSuggestions() {
-        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+    /**
+     * IndexedDBから全ての家計簿データを読み込む関数
+     * @returns {Promise<Array<object>>} 全家計簿データの配列
+     */
+    async function loadAllData() {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.ENTRIES], 'readonly');
+            const store = transaction.objectStore(STORE_NAMES.ENTRIES);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                resolve(event.target.result);
+            };
+
+            request.onerror = (event) => {
+                console.error('Error loading all data from IndexedDB:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
+    }
+
+    /**
+     * 全ての家計簿データをロードし、カスタムカテゴリとメモ候補を更新 (非同期化)
+     */
+    async function loadAllDataForSuggestions() {
+        const allData = await loadAllData() || [];
+        customCategories.clear();
+        pastNotes.clear();
+
         allData.forEach(item => {
             if (item.category === "その他" && item.note) {
                 customCategories.add(item.note);
@@ -798,151 +882,151 @@
                 pastNotes.add(item.note);
             }
         });
-        updateCategoryOptions(); // カスタムカテゴリを含むカテゴリ候補を更新
-        updateMemoSuggestions(); // メモ候補を更新
+        updateCategoryOptions();
+        updateMemoSuggestions();
     }
 
-    // 履歴データを読み込み、現在の月に合わせて表示する関数 (フィルタリング機能追加)
-    function loadAndDisplayData() {
-      let allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
-      historyList.innerHTML = ""; // 既存の表示をクリア
 
-      // === フィルタリング処理 ===
-      const filterKeyword = filterKeywordInput.value.toLowerCase();
-      const filterType = filterTypeSelect.value;
-      const filterCategory = filterCategorySelect.value;
-      const filterAmountMin = parseInt(filterAmountMinInput.value, 10);
-      const filterAmountMax = parseInt(filterAmountMaxInput.value, 10);
+    /**
+     * 履歴データを読み込み、現在の月に合わせて表示する関数 (非同期化)
+     */
+    async function loadAndDisplayData() {
+        let allData = await loadAllData() || [];
+        historyList.innerHTML = "";
 
-      const filteredData = allData.filter(item => {
-          // キーワードフィルター (メモまたはタグ)
-          const keywordMatch = !filterKeyword ||
-                               (item.note && item.note.toLowerCase().includes(filterKeyword)) ||
-                               (item.tags && item.tags.some(tag => tag.toLowerCase().includes(filterKeyword)));
-          
-          // 種別フィルター
-          const typeMatch = !filterType || item.type === filterType;
+        const filterKeyword = filterKeywordInput.value.toLowerCase();
+        const filterType = filterTypeSelect.value;
+        const filterCategory = filterCategorySelect.value;
+        const filterAmountMin = parseInt(filterAmountMinInput.value, 10);
+        const filterAmountMax = parseInt(filterAmountMaxInput.value, 10);
 
-          // カテゴリフィルター
-          const categoryMatch = !filterCategory || item.category === filterCategory;
+        const filteredData = allData.filter(item => {
+            const keywordMatch = !filterKeyword ||
+                                  (item.note && item.note.toLowerCase().includes(filterKeyword)) ||
+                                  (item.tags && item.tags.some(tag => tag.toLowerCase().includes(filterKeyword)));
 
-          // 金額範囲フィルター
-          const amountMatch = (isNaN(filterAmountMin) || item.amount >= filterAmountMin) &&
-                               (isNaN(filterAmountMax) || item.amount <= filterAmountMax);
+            const typeMatch = !filterType || item.type === filterType;
+            const categoryMatch = !filterCategory || item.category === filterCategory;
+            const amountMatch = (isNaN(filterAmountMin) || item.amount >= filterAmountMin) &&
+                                 (isNaN(filterAmountMax) || item.amount <= filterAmountMax);
 
-          return keywordMatch && typeMatch && categoryMatch && amountMatch;
-      });
-
-      // 現在表示中の月のデータをフィルタリング
-      const currentMonthYear = currentMonth.getFullYear();
-      const currentMonthMonth = currentMonth.getMonth(); // 0-indexed
-
-      // フィルタリングされたデータの中から、現在の月のデータのみを表示対象とする
-      const monthlyData = filteredData.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate.getFullYear() === currentMonthYear && itemDate.getMonth() === currentMonthMonth;
-      });
-
-      monthlyData.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-      const groupedData = {};
-      monthlyData.forEach(item => {
-        if (!groupedData[item.date]) {
-          groupedData[item.date] = [];
-        }
-        groupedData[item.date].push(item);
-      });
-
-      if (Object.keys(groupedData).length === 0) {
-        historyList.innerHTML = '<p style="text-align: center; color: #777; margin-top: 2em;">この月には履歴がありません。</p>';
-        if (filterKeyword || filterType || filterCategory || !isNaN(filterAmountMin) || !isNaN(filterAmountMax)) {
-            historyList.innerHTML += '<p style="text-align: center; color: #777; font-size: 0.9em;">（検索条件に合う項目が見つかりませんでした）</p>';
-        }
-      } else {
-        for (const date in groupedData) {
-          if (groupedData.hasOwnProperty(date)) {
-            const dailyItems = groupedData[date];
-
-            const dateHeader = document.createElement("div");
-            dateHeader.className = "date-header";
-            const [year, month, day] = date.split('-');
-            const dayOfWeek = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
-            const formattedDate = `${year}年${parseInt(month)}月${parseInt(day)}日 (${dayOfWeek})`;
-
-            dateHeader.textContent = formattedDate;
-            historyList.appendChild(dateHeader);
-
-            const ul = document.createElement("ul");
-            ul.className = "daily-list";
-
-            dailyItems.forEach((item) => {
-              // 削除時のインデックスは、フィルタリング前のallDataにおける元のインデックスを使う
-              // これはfilterされた配列のindexOfを使うと誤動作するので注意
-              // より堅牢な実装には、各データに一意のID（例: UUID）を付与することを推奨
-              const originalIndex = allData.findIndex(d => 
-                  d.type === item.type && 
-                  d.date === item.date && 
-                  d.category === item.category && 
-                  d.amount === item.amount &&
-                  d.note === item.note &&
-                  JSON.stringify(d.tags) === JSON.stringify(item.tags)
-              );
-
-
-              const li = document.createElement("li");
-              li.className = item.type === "支出" ? "expense-item" : "income-item";
-              li.innerHTML = `
-                <span class="item-details">
-                  <span class="item-type">${item.type}</span>
-                  <span class="item-category">${item.category}</span>
-                  <span class="item-amount">¥${item.amount.toLocaleString()}</span>
-                  ${item.note ? `<span class="item-note">${item.note}</span>` : ''}
-                  ${item.tags && item.tags.length > 0 ? `<span class="item-tags">${item.tags.map(tag => `#${tag}`).join(' ')}</span>` : ''}
-                </span>
-                <button class="delete-btn" data-index="${originalIndex}">削除</button>
-              `;
-              ul.appendChild(li);
-            });
-            historyList.appendChild(ul);
-          }
-        }
-      }
-
-      document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-          const index = parseInt(e.target.dataset.index, 10);
-          deleteData(index);
+            return keywordMatch && typeMatch && categoryMatch && amountMatch;
         });
-      });
 
-      updateMonthDisplay();
-      updateSummary(monthlyData); // フィルタリングされたデータではなく、現在の月のデータで集計
-      updateCharts(monthlyData); // フィルタリングされたデータではなく、現在の月のデータでグラフ
-      updateBudgetStatus(monthlyData); // 予算実績を更新
+        const currentMonthYear = currentMonth.getFullYear();
+        const currentMonthMonth = currentMonth.getMonth();
+
+        const monthlyData = filteredData.filter(item => {
+            const itemDate = new Date(item.date);
+            return itemDate.getFullYear() === currentMonthYear && itemDate.getMonth() === currentMonthMonth;
+        });
+
+        monthlyData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const groupedData = {};
+        monthlyData.forEach(item => {
+            if (!groupedData[item.date]) {
+                groupedData[item.date] = [];
+            }
+            groupedData[item.date].push(item);
+        });
+
+        if (Object.keys(groupedData).length === 0) {
+            historyList.innerHTML = '<p style="text-align: center; color: #777; margin-top: 2em;">この月には履歴がありません。</p>';
+            if (filterKeyword || filterType || filterCategory || !isNaN(filterAmountMin) || !isNaN(filterAmountMax)) {
+                historyList.innerHTML += '<p style="text-align: center; color: #777; font-size: 0.9em;">（検索条件に合う項目が見つかりませんでした）</p>';
+            }
+        } else {
+            for (const date in groupedData) {
+                if (groupedData.hasOwnProperty(date)) {
+                    const dailyItems = groupedData[date];
+
+                    const dateHeader = document.createElement("div");
+                    dateHeader.className = "date-header";
+                    const [year, month, day] = date.split('-');
+                    const dayOfWeek = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
+                    const formattedDate = `${year}年${parseInt(month)}月${parseInt(day)}日 (${dayOfWeek})`;
+
+                    dateHeader.textContent = formattedDate;
+                    historyList.appendChild(dateHeader);
+
+                    const ul = document.createElement("ul");
+                    ul.className = "daily-list";
+
+                    dailyItems.forEach((item) => {
+                        const li = document.createElement("li");
+                        li.className = item.type === "支出" ? "expense-item" : "income-item";
+                        li.innerHTML = `
+                            <span class="item-details">
+                              <span class="item-type">${item.type}</span>
+                              <span class="item-category">${item.category}</span>
+                              <span class="item-amount">¥${item.amount.toLocaleString()}</span>
+                              ${item.note ? `<span class="item-note">${item.note}</span>` : ''}
+                              ${item.tags && item.tags.length > 0 ? `<span class="item-tags">${item.tags.map(tag => `#${tag}`).join(' ')}</span>` : ''}
+                            </span>
+                            <button class="delete-btn" data-id="${item.id}">削除</button>
+                        `;
+                        ul.appendChild(li);
+                    });
+                    historyList.appendChild(ul);
+                }
+            }
+        }
+
+        document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const idToDelete = parseInt(e.target.dataset.id, 10);
+                await deleteData(idToDelete);
+            });
+        });
+
+        updateMonthDisplay();
+        updateSummary(monthlyData);
+        updateCharts(monthlyData);
+        updateBudgetStatus(monthlyData);
     }
 
-    function deleteData(index) {
-      const existing = JSON.parse(localStorage.getItem("kakeibo")) || [];
-      if (confirm("この項目を削除してもよろしいですか？")) {
-        existing.splice(index, 1);
-        localStorage.setItem("kakeibo", JSON.stringify(existing));
-        loadAndDisplayData();
-        loadAllDataForSuggestions(); // 削除後にメモ・カテゴリ候補を更新
-      }
+    /**
+     * IndexedDBから家計簿データを削除する関数
+     * @param {number} id 削除する家計簿エントリのID
+     */
+    async function deleteData(id) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            if (confirm("この項目を削除してもよろしいですか？")) {
+                const transaction = db.transaction([STORE_NAMES.ENTRIES], 'readwrite');
+                const store = transaction.objectStore(STORE_NAMES.ENTRIES);
+                const request = store.delete(id);
+
+                request.onsuccess = () => {
+                    console.log('Data deleted from IndexedDB:', id);
+                    loadAndDisplayData();
+                    loadAllDataForSuggestions();
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error deleting data from IndexedDB:', event.target.errorCode);
+                    reject(event.target.errorCode);
+                };
+            } else {
+                resolve();
+            }
+        });
     }
 
     function updateMonthDisplay() {
       currentMonthDisplay.textContent = currentMonth.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' });
     }
 
-    prevMonthBtn.addEventListener("click", () => {
+    prevMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() - 1);
-      loadAndDisplayData();
+      await loadAndDisplayData();
     });
 
-    nextMonthBtn.addEventListener("click", () => {
+    nextMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() + 1);
-      loadAndDisplayData();
+      await loadAndDisplayData();
     });
 
     function updateSummary(data) {
@@ -962,7 +1046,7 @@
       balanceSpan.textContent = `¥${(totalIncome - totalExpense).toLocaleString()}`;
     }
 
-    function updateCharts(monthlyData) {
+    async function updateCharts(monthlyData) {
       if (myChartInstance) {
         myChartInstance.destroy();
       }
@@ -972,7 +1056,7 @@
       if (activeTab === 'pieChartTab') {
         renderPieChart(monthlyData);
       } else if (activeTab === 'barChartTab') {
-        renderMonthlyBarChart();
+        await renderMonthlyBarChart();
       }
     }
 
@@ -1011,8 +1095,8 @@
       });
     }
 
-    function renderMonthlyBarChart() {
-        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+    async function renderMonthlyBarChart() {
+        const allData = await loadAllData() || [];
         const monthlySummary = {};
 
         allData.forEach(item => {
@@ -1069,11 +1153,11 @@
                 },
                 scales: {
                     x: {
-                        stacked: false // 必要に応じてtrue
+                        stacked: false
                     },
                     y: {
                         beginAtZero: true,
-                        stacked: false // 必要に応じてtrue
+                        stacked: false
                     }
                 }
             }
@@ -1090,24 +1174,22 @@
       return colors;
     }
 
-    pieChartTab.addEventListener('click', () => {
+    pieChartTab.addEventListener('click', async () => {
       pieChartTab.classList.add('active');
       barChartTab.classList.remove('active');
-      updateCharts(filterAndSortMonthlyData()); // 現在表示中の月のデータを渡す
+      updateCharts(await filterAndSortMonthlyData());
     });
 
-    barChartTab.addEventListener('click', () => {
+    barChartTab.addEventListener('click', async () => {
       barChartTab.classList.add('active');
       pieChartTab.classList.remove('active');
-      updateCharts(filterAndSortMonthlyData()); // 現在表示中の月のデータを渡す
+      updateCharts(await filterAndSortMonthlyData());
     });
 
-    // filterAndSortMonthlyData関数は、loadAndDisplayData内の月データ抽出ロジックと同じもの
-    // chart.jsの更新時にも同じデータセットを渡すために抽出
-    function filterAndSortMonthlyData() {
-        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+    async function filterAndSortMonthlyData() {
+        const allData = await loadAllData() || [];
         const currentMonthYear = currentMonth.getFullYear();
-        const currentMonthMonth = currentMonth.getMonth(); // 0-indexed
+        const currentMonthMonth = currentMonth.getMonth();
 
         return allData.filter(item => {
             const itemDate = new Date(item.date);
@@ -1116,18 +1198,15 @@
     }
 
 
-    exportCsvBtn.addEventListener('click', () => {
-        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+    exportCsvBtn.addEventListener('click', async () => {
+        const allData = await loadAllData() || [];
         if (allData.length === 0) {
             alert("エクスポートするデータがありません。");
             return;
         }
 
-        // CSVヘッダー
         const headers = ["日付", "種別", "カテゴリ", "金額", "メモ", "タグ"];
-        // データ行の生成
         const csvRows = allData.map(item => {
-            // カンマを含むメモやタグはダブルクォートで囲む
             const escapeCsv = (value) => {
                 if (value === null || value === undefined) return '';
                 let stringValue = String(value);
@@ -1148,15 +1227,12 @@
             ].join(',');
         });
 
-        // CSVコンテンツを結合
         const csvContent = [headers.join(','), ...csvRows].join('\n');
 
-        // Blobオブジェクトを作成
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 
-        // ダウンロードリンクを作成してクリック
         const link = document.createElement('a');
-        if (link.download !== undefined) { // HTML5 download attribute
+        if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
             link.setAttribute('download', '家計簿データ.csv');
@@ -1164,54 +1240,117 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        } else { // Fallback for older browsers
+        } else {
             alert("お使いのブラウザはCSVエクスポートに対応していません。");
         }
     });
 
     // 固定支出の機能
-    function saveFixedExpenses(fixedExpenses) {
-        localStorage.setItem("fixedExpenses", JSON.stringify(fixedExpenses));
+    /**
+     * 固定支出データをIndexedDBに保存する関数
+     * @param {Array<object>} fixedExpenses 保存する固定支出の配列
+     */
+    async function saveFixedExpenses(fixedExpenses) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.FIXED_EXPENSES], 'readwrite');
+            const store = transaction.objectStore(STORE_NAMES.FIXED_EXPENSES);
+
+            const clearRequest = store.clear();
+            clearRequest.onsuccess = () => {
+                let addCount = 0;
+                fixedExpenses.forEach(item => {
+                    const addRequest = store.add(item);
+                    addRequest.onsuccess = () => {
+                        addCount++;
+                        if (addCount === fixedExpenses.length) {
+                            console.log('Fixed expenses saved to IndexedDB.');
+                            resolve();
+                        }
+                    };
+                    addRequest.onerror = (event) => console.error('Error adding fixed expense:', event.target.errorCode);
+                });
+                if (fixedExpenses.length === 0) {
+                    console.log('No fixed expenses to save.');
+                    resolve();
+                }
+            };
+            clearRequest.onerror = (event) => {
+                console.error('Error clearing fixed expenses store:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
     }
 
-    function loadFixedExpenses() {
-        return JSON.parse(localStorage.getItem("fixedExpenses")) || [];
+    /**
+     * IndexedDBから全ての固定支出データを読み込む関数
+     * @returns {Promise<Array<object>>} 全固定支出データの配列
+     */
+    async function loadFixedExpenses() {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.FIXED_EXPENSES], 'readonly');
+            const store = transaction.objectStore(STORE_NAMES.FIXED_EXPENSES);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                resolve(event.target.result);
+            };
+            request.onerror = (event) => {
+                console.error('Error loading fixed expenses from IndexedDB:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
     }
 
-    function renderFixedExpenseList() {
-        const fixedExpenses = loadFixedExpenses();
+    async function renderFixedExpenseList() {
+        const fixedExpenses = await loadFixedExpenses();
         fixedExpenseList.innerHTML = '';
         if (fixedExpenses.length === 0) {
             fixedExpenseList.innerHTML = '<p style="text-align: center; color: #777; font-size: 0.9em;">登録済みの固定支出はありません。</p>';
             return;
         }
-        fixedExpenses.forEach((item, index) => {
+        fixedExpenses.forEach((item) => {
             const li = document.createElement('li');
             li.innerHTML = `
                 <span>${item.category}: ¥${item.amount.toLocaleString()} (${item.note})</span>
-                <button class="delete-fixed-btn" data-index="${index}">削除</button>
+                <button class="delete-fixed-btn" data-id="${item.id}">削除</button>
             `;
             fixedExpenseList.appendChild(li);
         });
 
         document.querySelectorAll('.delete-fixed-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const index = parseInt(e.target.dataset.index, 10);
-                deleteFixedExpense(index);
+            button.addEventListener('click', async (e) => {
+                const idToDelete = parseInt(e.target.dataset.id, 10);
+                await deleteFixedExpense(idToDelete);
             });
         });
     }
 
-    function deleteFixedExpense(index) {
-        let fixedExpenses = loadFixedExpenses();
-        if (confirm("この固定支出を削除してもよろしいですか？")) {
-            fixedExpenses.splice(index, 1);
-            saveFixedExpenses(fixedExpenses);
-            renderFixedExpenseList();
-        }
+    async function deleteFixedExpense(id) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            if (confirm("この固定支出を削除してもよろしいですか？")) {
+                const transaction = db.transaction([STORE_NAMES.FIXED_EXPENSES], 'readwrite');
+                const store = transaction.objectStore(STORE_NAMES.FIXED_EXPENSES);
+                const request = store.delete(id);
+
+                request.onsuccess = () => {
+                    console.log('Fixed expense deleted from IndexedDB:', id);
+                    renderFixedExpenseList();
+                    resolve();
+                };
+                request.onerror = (event) => {
+                    console.error('Error deleting fixed expense from IndexedDB:', event.target.errorCode);
+                    reject(event.target.errorCode);
+                };
+            } else {
+                resolve();
+            }
+        });
     }
 
-    addFixedExpenseBtn.addEventListener('click', () => {
+    addFixedExpenseBtn.addEventListener('click', async () => {
         const category = fixedExpenseCategorySelect.value;
         const amount = parseInt(fixedExpenseAmountInput.value, 10);
         const note = fixedExpenseNoteInput.value;
@@ -1221,17 +1360,17 @@
             return;
         }
 
-        const fixedExpenses = loadFixedExpenses();
+        let fixedExpenses = await loadFixedExpenses();
         fixedExpenses.push({ category, amount, note });
-        saveFixedExpenses(fixedExpenses);
+        await saveFixedExpenses(fixedExpenses);
         renderFixedExpenseList();
         fixedExpenseAmountInput.value = '';
         fixedExpenseNoteInput.value = '';
         fixedExpenseCategorySelect.value = '';
     });
 
-    addMonthlyFixedExpensesBtn.addEventListener('click', () => {
-        const fixedExpenses = loadFixedExpenses();
+    addMonthlyFixedExpensesBtn.addEventListener('click', async () => {
+        const fixedExpenses = await loadFixedExpenses();
         if (fixedExpenses.length === 0) {
             alert("登録済みの固定支出がありません。");
             return;
@@ -1242,37 +1381,95 @@
         }
 
         const today = new Date();
-        const dateString = today.toISOString().slice(0, 10); // 今日の日付をYYYY-MM-DD形式で取得
+        const dateString = today.toISOString().slice(0, 10);
 
         let addedCount = 0;
-        fixedExpenses.forEach(fixedItem => {
+        for (const fixedItem of fixedExpenses) {
             const data = {
                 type: "支出",
-                date: dateString, // 今日の日付として追加
+                date: dateString,
                 category: fixedItem.category,
                 amount: fixedItem.amount,
-                note: `[固定] ${fixedItem.note || fixedItem.category}`, // 固定支出であることを明示
-                tags: ['固定費'] // 固定費タグを追加
+                note: `[固定] ${fixedItem.note || fixedItem.category}`,
+                tags: ['固定費']
             };
-            saveData(data);
+            await saveData(data);
             addedCount++;
-        });
+        }
         alert(`${addedCount}件の固定支出を今月に追加しました。`);
-        loadAndDisplayData();
+        await loadAndDisplayData();
     });
 
 
     // 予算設定の機能
-    function saveBudgets(budgets) {
-        localStorage.setItem("budgets", JSON.stringify(budgets));
+    /**
+     * 予算データをIndexedDBに保存する関数
+     * @param {object} budgets 保存する予算オブジェクト（カテゴリをキーとする）
+     */
+    async function saveBudgets(budgets) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.BUDGETS], 'readwrite');
+            const store = transaction.objectStore(STORE_NAMES.BUDGETS);
+
+            const clearRequest = store.clear();
+            clearRequest.onsuccess = () => {
+                const budgetCategories = Object.keys(budgets);
+                let addCount = 0;
+                if (budgetCategories.length === 0) {
+                    console.log('No budgets to save.');
+                    resolve();
+                    return;
+                }
+
+                budgetCategories.forEach(category => {
+                    const budgetItem = { category: category, amount: budgets[category] };
+                    const addRequest = store.put(budgetItem);
+                    addRequest.onsuccess = () => {
+                        addCount++;
+                        if (addCount === budgetCategories.length) {
+                            console.log('Budgets saved to IndexedDB.');
+                            resolve();
+                        }
+                    };
+                    addRequest.onerror = (event) => console.error('Error adding budget:', event.target.errorCode);
+                });
+            };
+            clearRequest.onerror = (event) => {
+                console.error('Error clearing budgets store:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
     }
 
-    function loadBudgets() {
-        return JSON.parse(localStorage.getItem("budgets")) || {}; // オブジェクトとして保存
+    /**
+     * IndexedDBから全ての予算データを読み込む関数
+     * @returns {Promise<object>} 予算オブジェクト（カテゴリをキーとする）
+     */
+    async function loadBudgets() {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAMES.BUDGETS], 'readonly');
+            const store = transaction.objectStore(STORE_NAMES.BUDGETS);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                const result = event.target.result;
+                const budgets = {};
+                result.forEach(item => {
+                    budgets[item.category] = item.amount;
+                });
+                resolve(budgets);
+            };
+            request.onerror = (event) => {
+                console.error('Error loading budgets from IndexedDB:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
     }
 
-    function renderBudgetList() {
-        const budgets = loadBudgets();
+    async function renderBudgetList() {
+        const budgets = await loadBudgets();
         budgetList.innerHTML = '';
         const budgetCategories = Object.keys(budgets);
 
@@ -1291,42 +1488,55 @@
         });
 
         document.querySelectorAll('.delete-budget-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
+            button.addEventListener('click', async (e) => {
                 const categoryToDelete = e.target.dataset.category;
-                deleteBudget(categoryToDelete);
+                await deleteBudget(categoryToDelete);
             });
         });
     }
 
-    function deleteBudget(category) {
-        let budgets = loadBudgets();
-        if (confirm(`${category}の予算を削除してもよろしいですか？`)) {
-            delete budgets[category];
-            saveBudgets(budgets);
-            renderBudgetList();
-            updateBudgetStatus(filterAndSortMonthlyData()); // 予算削除後、実績も更新
-        }
+    async function deleteBudget(category) {
+        if (!db) await openDB();
+        return new Promise((resolve, reject) => {
+            if (confirm(`${category}の予算を削除してもよろしいですか？`)) {
+                const transaction = db.transaction([STORE_NAMES.BUDGETS], 'readwrite');
+                const store = transaction.objectStore(STORE_NAMES.BUDGETS);
+                const request = store.delete(category);
+
+                request.onsuccess = () => {
+                    console.log('Budget deleted from IndexedDB:', category);
+                    renderBudgetList();
+                    updateBudgetStatus(filterAndSortMonthlyData());
+                    resolve();
+                };
+                request.onerror = (event) => {
+                    console.error('Error deleting budget from IndexedDB:', event.target.errorCode);
+                    reject(event.target.errorCode);
+                };
+            } else {
+                resolve();
+            }
+        });
     }
 
-    setBudgetBtn.addEventListener('click', () => {
+    setBudgetBtn.addEventListener('click', async () => {
         const category = budgetCategorySelect.value;
         const amount = parseInt(budgetAmountInput.value, 10);
 
-        if (!category || isNaN(amount) || amount < 0) { // 予算は0も許容
+        if (!category || isNaN(amount) || amount < 0) {
             alert("カテゴリと予算額は必須入力です。予算額は数値で入力してください。");
             return;
         }
 
-        let budgets = loadBudgets();
-        budgets[category] = amount; // 上書き保存
-        saveBudgets(budgets);
+        let budgets = await loadBudgets();
+        budgets[category] = amount;
+        await saveBudgets(budgets);
         renderBudgetList();
         budgetAmountInput.value = '';
         budgetCategorySelect.value = '';
-        updateBudgetStatus(filterAndSortMonthlyData()); // 予算設定後、実績も更新
+        updateBudgetStatus(await filterAndSortMonthlyData());
     });
 
-    // 予算設定カテゴリの初期化
     function initBudgetCategorySelect() {
         const expenseCategories = categoryOptions["支出"];
         budgetCategorySelect.innerHTML = '<option value="">選択してください</option>';
@@ -1336,7 +1546,6 @@
             opt.textContent = cat;
             budgetCategorySelect.appendChild(opt);
         });
-         // カスタムカテゴリも追加
         customCategories.forEach(cat => {
             if (!expenseCategories.includes(cat)) {
                 const opt = document.createElement("option");
@@ -1348,14 +1557,13 @@
     }
 
 
-    function updateBudgetStatus(monthlyData) {
-        const budgets = loadBudgets();
+    async function updateBudgetStatus(monthlyData) {
+        const budgets = await loadBudgets();
         budgetStatusDiv.innerHTML = '<h3>今月の予算実績</h3>';
         let hasBudget = false;
 
         const monthlyExpensesByCategory = {};
         monthlyData.filter(item => item.type === "支出").forEach(item => {
-            // カスタムカテゴリの場合、メモの内容をカテゴリとして集計
             const actualCategory = (item.category === "その他" && item.note && customCategories.has(item.note)) ? item.note : item.category;
             monthlyExpensesByCategory[actualCategory] = (monthlyExpensesByCategory[actualCategory] || 0) + item.amount;
         });
@@ -1365,7 +1573,7 @@
             const budgetAmount = budgets[category];
             const actualExpense = monthlyExpensesByCategory[category] || 0;
             const remaining = budgetAmount - actualExpense;
-            const isWarning = remaining < 0; // 予算オーバー
+            const isWarning = remaining < 0;
 
             const budgetItem = document.createElement('div');
             budgetItem.className = `budget-item ${isWarning ? 'warning' : ''}`;
@@ -1377,16 +1585,14 @@
         }
 
         if (!hasBudget) {
-            budgetStatusDiv.appendChild(noBudgetSetMessage); // 予算が設定されていませんメッセージを表示
+            budgetStatusDiv.appendChild(noBudgetSetMessage);
         } else {
-            noBudgetSetMessage.remove(); // 予算が設定されていればメッセージを削除
+            noBudgetSetMessage.remove();
         }
     }
 
-    // フィルタリングカテゴリの初期化
     function initFilterCategorySelect() {
         const allCategories = new Set();
-        // 既存のカテゴリとカスタムカテゴリを統合
         categoryOptions["支出"].forEach(cat => allCategories.add(cat));
         categoryOptions["収入"].forEach(cat => allCategories.add(cat));
         customCategories.forEach(cat => allCategories.add(cat));
@@ -1401,25 +1607,26 @@
     }
 
     searchBtn.addEventListener('click', loadAndDisplayData);
-    resetFilterBtn.addEventListener('click', () => {
+    resetFilterBtn.addEventListener('click', async () => {
         filterKeywordInput.value = '';
         filterTypeSelect.value = '';
         filterCategorySelect.value = '';
         filterAmountMinInput.value = '';
         filterAmountMaxInput.value = '';
-        loadAndDisplayData(); // フィルターをリセットして再表示
+        await loadAndDisplayData();
     });
 
     // 初期化関数
-    function init() {
-      loadAllDataForSuggestions(); // 最初にすべてのデータをロードしてカスタムカテゴリとメモ候補を更新
-      updateCategoryOptions(); // 種別選択肢を初期化
-      initFilterCategorySelect(); // フィルタカテゴリを初期化
-      initBudgetCategorySelect(); // 予算カテゴリを初期化
-      renderFixedExpenseList(); // 固定支出リストをレンダリング
-      renderBudgetList(); // 予算リストをレンダリング
-      loadAndDisplayData(); // データを読み込んで表示
-      updateCharts(filterAndSortMonthlyData()); // 初期グラフをレンダリング
+    async function init() {
+      await openDB();
+      await loadAllDataForSuggestions();
+      updateCategoryOptions();
+      initFilterCategorySelect();
+      initBudgetCategorySelect();
+      await renderFixedExpenseList();
+      await renderBudgetList();
+      await loadAndDisplayData();
+      updateCharts(await filterAndSortMonthlyData());
     }
 
     // ページロード時に初期化
@@ -1431,7 +1638,6 @@
             const targetId = e.currentTarget.dataset.target;
             const targetElement = document.getElementById(targetId);
             if (targetElement) {
-                // スムーズスクロール
                 targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
