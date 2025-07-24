@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>家計簿アプリ</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="manifest" href="./manifest.json">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="家計簿">
+  <link rel="apple-touch-icon" href="./icon-192x192.png">
+
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <link rel="icon" type="image/png" href="./icon-192x192.png" sizes="192x192">
+  <link rel="icon" type="image/png" href="./icon-512x512.png" sizes="512x512">
+
+  <style>
+    body {
+      font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      padding: 1.5em;
+      padding-bottom: 60px; /* フッターナビゲーションの高さ分、下部に余白を追加 */
+      max-width: 480px;
+      margin: auto;
+      background: #f0f2f5;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 1.5em;
+      font-size: 2em;
+    }
+
+    /* 各セクションの開始位置を示すためにIDにpadding-topとmargin-topを追加 */
+    h2 {
+      color: #2c3e50;
+      margin-top: 2em;
+      margin-bottom: 1em;
+      padding-top: 60px; /* フッターの高さ分、paddingを追加して要素が隠れないように */
+    }
+    /* 最初のH2（固定支出の登録）はフォームの後なので、padding-topは不要 */
+    h2:first-of-type {
+        padding-top: 0;
+    }
+
+
+    form, .fixed-expense-section, .budget-section, .filter-section { /* formに加えて新しいセクションにもスタイル適用 */
+      background: #ffffff;
+      padding: 1.5em;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 2em;
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+    }
+
+    form label, .fixed-expense-section label, .budget-section label, .filter-section label { /* 全てのラベルにスタイル適用 */
+      display: block;
+      margin-bottom: 0.8em;
+      font-weight: bold;
+    }
+
+    form label input,
+    form label select,
+    .fixed-expense-section label input,
+    .fixed-expense-section label select,
+    .budget-section label input, /* 予算入力フィールド */
+    .budget-section label select, /* 予算カテゴリ選択 */
+    .filter-section label input, /* 検索入力フィールド */
+    .filter-section label select {
+      display: block;
+      width: calc(100% - 1em);
+      padding: 0.7em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+      box-sizing: border-box;
+      margin-top: 0.2em;
+    }
+
+    button[type="submit"], .add-fixed-expense-btn, #addMonthlyFixedExpensesBtn,
+    .budget-btn, #searchBtn, #resetFilterBtn { /* 全てのボタンの共通スタイル */
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 0.8em;
+      cursor: pointer;
+      margin-top: 0.5em;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+      width: 100%;
+    }
+
+    button[type="submit"]:hover, .add-fixed-expense-btn:hover, #addMonthlyFixedExpensesBtn:hover,
+    .budget-btn:hover, #searchBtn:hover, #resetFilterBtn:hover {
+      background: #218838;
+    }
+
+    #searchBtn { background: #007bff; }
+    #searchBtn:hover { background: #0056b3; }
+    #resetFilterBtn { background: #6c757d; }
+    #resetFilterBtn:hover { background: #5a6268; }
+
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    /* 日付見出しのスタイル */
+    .date-header {
+      background-color: #e0e0e0;
+      padding: 0.8em 1em;
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+      font-weight: bold;
+      color: #555;
+      border-bottom: 1px solid #ddd;
+      border-radius: 4px 4px 0 0;
+    }
+
+    /* 各日のリストコンテナ */
+    .daily-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* 各履歴アイテムのスタイル */
+    .daily-list li {
+      background: #ffffff;
+      margin: 0.2em 0;
+      padding: 0.8em 1em;
+      border-left: 5px solid;
+      border-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    /* 支出と収入のボーダー色 */
+    .expense-item {
+      border-color: #dc3545;
+    }
+
+    .income-item {
+      border-color: #28a745;
+    }
+
+    /* 各項目詳細のスタイル */
+    .item-details {
+      flex-grow: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3em 0.8em;
+      margin-right: 1em;
+      align-items: baseline;
+    }
+
+    .item-type {
+      font-weight: bold;
+      color: #333;
+      min-width: 45px;
+      flex-shrink: 0;
+    }
+    .item-category {
+      color: #333;
+      font-weight: 500;
+      min-width: 70px;
+      flex-shrink: 0;
+    }
+    .item-amount {
+      font-weight: bold;
+      color: #000;
+      margin-left: auto;
+      font-size: 1.1em;
+      flex-shrink: 0;
+    }
+    .item-note {
+      font-size: 0.9em;
+      color: #666;
+      flex-basis: 100%;
+      margin-top: 0.3em;
+    }
+    .item-tags { /* タグの表示スタイル */
+      font-size: 0.8em;
+      color: #007bff;
+      flex-basis: 100%;
+      margin-top: 0.3em;
+    }
+
+    /* 削除ボタンのスタイル */
+    .delete-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.4em 0.8em;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8em;
+      flex-shrink: 0;
+      margin-left: 0.5em;
+      align-self: center;
+      transition: background 0.2s ease;
+    }
+
+    .delete-btn:hover {
+      background: #c82333;
+    }
+
+    /* 月切り替えと分析セクション */
+    .month-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2em;
+      margin-bottom: 1.5em;
+      background: #ffffff;
+      padding: 0.8em;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .month-navigation button {
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      color: #2c3e50;
+      cursor: pointer;
+      padding: 0.2em 0.5em;
+    }
+
+    .month-display {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .summary-section {
+      background: #ffffff;
+      padding: 1.2em;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 2em;
+      text-align: center;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5em;
+      font-size: 1.1em;
+    }
+    .summary-item span:first-child {
+      font-weight: bold;
+    }
+    .summary-item.income span:last-child { color: #28a745; }
+    .summary-item.expense span:last-child { color: #dc3545; }
+    .summary-item.total span:last-child { font-weight: bold; color: #2c3e50; }
+
+    /* 予算表示のスタイル */
+    .budget-status {
+        margin-top: 1.5em;
+        padding-top: 1em;
+        border-top: 1px solid #eee;
+    }
+    .budget-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5em;
+        font-size: 0.95em;
+    }
+    .budget-item.warning {
+        color: #dc3545; /* 予算オーバー警告色 */
+        font-weight: bold;
+    }
+    .budget-item span:first-child {
+        font-weight: bold;
+    }
+
+
+    .chart-tabs {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 1.5em;
+      background: #ffffff;
+      padding: 0.5em;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .chart-tabs button {
+      flex: 1;
+      padding: 0.8em 0.5em;
+      border: none;
+      background: none;
+      font-size: 1em;
+      cursor: pointer;
+      color: #666;
+      border-radius: 6px;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .chart-tabs button.active {
+      background: #28a745;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .chart-tabs button:hover:not(.active) {
+      background: #f0f0f0;
+    }
+
+    .chart-container {
+      background: #ffffff;
+      padding: 1.5em;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 2em;
+    }
+    .chart-container canvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* CSVエクスポートボタンのスタイル */
+    #exportCsvBtn {
+        width: 100%;
+        padding: 0.8em;
+        background: #007bff; /* 青色 */
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-top: 1em;
+        border-radius: 4px;
+        transition: background 0.3s ease;
+    }
+    #exportCsvBtn:hover {
+        background: #0056b3; /* ホバーで少し暗く */
+    }
+
+    /* 固定支出リストのスタイル */
+    #fixedExpenseList {
+        list-style: none;
+        padding: 0;
+    }
+    #fixedExpenseList li {
+        background: #f8f8f8;
+        padding: 0.8em 1em;
+        margin-bottom: 0.5em;
+        border-left: 5px solid #6c757d; /* 固定支出は灰色ボーダー */
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    #fixedExpenseList li .delete-fixed-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.3em 0.6em;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.7em;
+        transition: background 0.2s ease;
+    }
+    #fixedExpenseList li .delete-fixed-btn:hover {
+        background: #c82333;
+    }
+
+    /* 検索フィルタリングセクション */
+    .filter-section .filter-buttons {
+        display: flex;
+        gap: 0.5em;
+    }
+    .filter-section .filter-buttons button {
+        flex: 1;
+    }
+
+    /* 入力候補リスト */
+    .autocomplete-list {
+        list-style: none;
+        padding: 0;
+        margin-top: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #fff;
+        max-height: 150px;
+        overflow-y: auto;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        position: absolute; /* 親要素が relative であることを想定 */
+        width: calc(100% - 3em); /* body padding 考慮 */
+        z-index: 100; /* 他の要素より手前に表示 */
+    }
+    .autocomplete-list li {
+        padding: 0.8em 1em;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+    }
+    .autocomplete-list li:last-child {
+        border-bottom: none;
+    }
+    .autocomplete-list li:hover {
+        background-color: #f0f0f0;
+    }
+
+    .form-group-relative {
+        position: relative;
+    }
+
+    /* --- 新しいCSS: フッターナビゲーション --- */
+    .footer-nav {
+        position: fixed; /* 画面下部に固定 */
+        bottom: 0; /* 下端に配置 */
+        left: 0;
+        width: 100%;
+        max-width: 480px; /* bodyのmax-widthに合わせる */
+        left: 50%;
+        transform: translateX(-50%); /* 中央揃え */
+        background: #343a40; /* ダーク系の背景色 */
+        display: flex;
+        justify-content: space-around;
+        padding: 8px 0;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.2); /* 上部に影 */
+        z-index: 1000; /* 他の要素より手前に表示 */
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+
+    .footer-nav button {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 0.8em;
+        padding: 0.5em 0.2em;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        flex: 1; /* 等幅で配置 */
+        transition: color 0.2s ease;
+    }
+
+    .footer-nav button:hover {
+        color: #28a745; /* ホバーでアクセントカラー */
+    }
+
+    /* アイコン部分のスタイル (Material Iconsなどを使う場合はフォントサイズで調整) */
+    .footer-nav button i {
+        font-size: 1.4em; /* アイコンのサイズ */
+        margin-bottom: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="top">家計簿</h1>
+  <form id="expense-form">
+    <label>種別：
+      <select id="type" required>
+        <option value="">選択してください</option>
+        <option value="支出">支出</option>
+        <option value="収入">収入</option>
+      </select>
+    </label>
+
+    <label>日付：
+      <input type="date" id="date" required />
+    </label>
+
+    <label>カテゴリ：
+      <select id="category" required>
+        <option value="">まず種別を選んでください</option>
+      </select>
+    </label>
+
+    <label>金額（円）：
+      <input type="number" id="amount" required min="0" />
+    </label>
+
+    <label class="form-group-relative">メモ：
+      <input type="text" id="note" list="memo-suggestions" />
+      <datalist id="memo-suggestions"></datalist>
+    </label>
+
+    <label>タグ（カンマ区切り）：
+      <input type="text" id="tags" placeholder="例: 食事,外食,ランチ" />
+    </label>
+
+    <button type="submit">追加</button>
+  </form>
+
+  <h2 id="budget-section-h2">予算設定</h2>
+  <div class="budget-section">
+    <h3>月間予算を設定</h3>
+    <label>カテゴリ：
+      <select id="budgetCategorySelect" required>
+        </select>
+    </label>
+    <label>予算額（円）：
+      <input type="number" id="budgetAmountInput" required min="0" />
+    </label>
+    <button type="button" id="setBudgetBtn" class="budget-btn">予算を設定</button>
+
+    <h3>現在の予算設定</h3>
+    <ul id="budgetList">
+      </ul>
+  </div>
+
+  <h2 id="fixed-expense-section-h2">固定支出の登録</h2>
+  <div class="fixed-expense-section">
+    <label>カテゴリ：
+      <select id="fixedExpenseCategory" required>
+        </select>
+    </label>
+    <label>金額（円）：
+      <input type="number" id="fixedExpenseAmount" required min="0" />
+    </label>
+    <label>メモ：
+      <input type="text" id="fixedExpenseNote" />
+    </label>
+    <button type="button" id="addFixedExpenseBtn" class="add-fixed-expense-btn">固定支出を登録</button>
+
+    <h3>登録済みの固定支出</h3>
+    <ul id="fixedExpenseList">
+      </ul>
+    <button type="button" id="addMonthlyFixedExpensesBtn">今月に固定支出を一括追加</button>
+  </div>
+
+
+  <h2 id="history-section-h2">履歴</h2>
+  <div class="month-navigation">
+    <button id="prevMonth">&lt;</button>
+    <span id="currentMonthDisplay" class="month-display"></span>
+    <button id="nextMonth">&gt;</button>
+  </div>
+
+  <div class="filter-section">
+    <h3>履歴の検索・絞り込み</h3>
+    <label>キーワード（メモ・タグ）：
+      <input type="search" id="filterKeyword" placeholder="例: ランチ, #旅行" />
+    </label>
+    <label>種別：
+      <select id="filterType">
+        <option value="">すべて</option>
+        <option value="支出">支出</option>
+        <option value="収入">収入</option>
+      </select>
+    </label>
+    <label>カテゴリ：
+      <select id="filterCategory">
+        <option value="">すべて</option>
+        </select>
+    </label>
+    <label>金額（下限）：
+      <input type="number" id="filterAmountMin" min="0" />
+    </label>
+    <label>金額（上限）：
+      <input type="number" id="filterAmountMax" min="0" />
+    </label>
+    <div class="filter-buttons">
+        <button type="button" id="searchBtn">検索</button>
+        <button type="button" id="resetFilterBtn">リセット</button>
+    </div>
+  </div>
+
+  <ul id="history"></ul>
+
+  <button id="exportCsvBtn">CSVでエクスポート</button>
+
+  <h2 id="analysis-section-h2">分析</h2>
+  <div class="summary-section">
+    <div class="summary-item income">
+      <span>収入</span><span id="totalIncome">¥0</span>
+    </div>
+    <div class="summary-item expense">
+      <span>支出</span><span id="totalExpense">¥0</span>
+    </div>
+    <hr style="margin: 1em 0; border: none; border-top: 1px solid #eee;">
+    <div class="summary-item total">
+      <span>合計</span><span id="balance">¥0</span>
+    </div>
+    <div class="budget-status" id="budgetStatus">
+        <h3>今月の予算実績</h3>
+        <p style="text-align: center; color: #777; font-size: 0.9em;" id="noBudgetSetMessage">予算が設定されていません。</p>
+        </div>
+  </div>
+
+  <div class="chart-tabs">
+    <button id="pieChartTab" class="active">カテゴリ別（円グラフ）</button>
+    <button id="barChartTab">月別推移（棒グラフ）</button>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="myChart"></canvas>
+  </div>
+
+  <div class="footer-nav">
+    <button class="nav-button" data-target="top">
+        <i class="material-icons">add_circle_outline</i>
+        <span>入力</span>
+    </button>
+    <button class="nav-button" data-target="budget-section-h2">
+        <i class="material-icons">account_balance_wallet</i>
+        <span>予算</span>
+    </button>
+    <button class="nav-button" data-target="fixed-expense-section-h2">
+        <i class="material-icons">event_note</i>
+        <span>固定</span>
+    </button>
+    <button class="nav-button" data-target="history-section-h2">
+        <i class="material-icons">history</i>
+        <span>履歴</span>
+    </button>
+    <button class="nav-button" data-target="analysis-section-h2">
+        <i class="material-icons">bar_chart</i>
+        <span>分析</span>
+    </button>
+  </div>
+
+  <script>
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then((registration) => {
+            console.log('Service Worker registered: ', registration);
+          })
+          .catch((error) => {
+            console.log('Service Worker registration failed: ', error);
+          });
+      });
+    }
+
+    const form = document.getElementById("expense-form");
+    const historyList = document.getElementById("history");
+    const typeSelect = document.getElementById("type");
+    const categorySelect = document.getElementById("category");
+    const amountInput = document.getElementById("amount"); // 金額入力フィールド
+    const noteInput = document.getElementById("note"); // メモ入力フィールド
+    const tagsInput = document.getElementById("tags"); // タグ入力フィールド
+    const currentMonthDisplay = document.getElementById("currentMonthDisplay");
+    const prevMonthBtn = document.getElementById("prevMonth");
+    const nextMonthBtn = document.getElementById("nextMonth");
+    const totalIncomeSpan = document.getElementById("totalIncome");
+    const totalExpenseSpan = document.getElementById("totalExpense");
+    const balanceSpan = document.getElementById("balance");
+    const pieChartTab = document.getElementById("pieChartTab");
+    const barChartTab = document.getElementById("barChartTab");
+    const myChartCanvas = document.getElementById("myChart");
+    const exportCsvBtn = document.getElementById("exportCsvBtn");
+
+    // 固定支出関連のDOM要素
+    const fixedExpenseCategorySelect = document.getElementById("fixedExpenseCategory");
+    const fixedExpenseAmountInput = document.getElementById("fixedExpenseAmount");
+    const fixedExpenseNoteInput = document.getElementById("fixedExpenseNote");
+    const addFixedExpenseBtn = document.getElementById("addFixedExpenseBtn");
+    const fixedExpenseList = document.getElementById("fixedExpenseList");
+    const addMonthlyFixedExpensesBtn = document.getElementById("addMonthlyFixedExpensesBtn");
+
+    // 予算設定関連のDOM要素
+    const budgetCategorySelect = document.getElementById("budgetCategorySelect");
+    const budgetAmountInput = document.getElementById("budgetAmountInput");
+    const setBudgetBtn = document.getElementById("setBudgetBtn");
+    const budgetList = document.getElementById("budgetList");
+    const budgetStatusDiv = document.getElementById("budgetStatus");
+    const noBudgetSetMessage = document.getElementById("noBudgetSetMessage");
+
+    // フィルタリング・検索関連のDOM要素
+    const filterKeywordInput = document.getElementById("filterKeyword");
+    const filterTypeSelect = document.getElementById("filterType");
+    const filterCategorySelect = document.getElementById("filterCategory");
+    const filterAmountMinInput = document.getElementById("filterAmountMin");
+    const filterAmountMaxInput = document.getElementById("filterAmountMax");
+    const searchBtn = document.getElementById("searchBtn");
+    const resetFilterBtn = document.getElementById("resetFilterBtn");
+    const memoSuggestionsDatalist = document.getElementById("memo-suggestions");
+
+
+    const categoryOptions = {
+      "支出": [
+        "食費", "日用品", "住居", "光熱費", "通信費", "保険", "医療費",
+        "被服・美容", "交通", "教育・書籍", "娯楽・交際", "サブスク",
+        "税金・年金", "その他"
+      ],
+      "収入": [
+        "給与", "副業", "お小遣い", "配当・投資", "その他"
+      ]
+    };
+
+    // 過去に入力されたカスタムカテゴリやメモを記憶するセット
+    let customCategories = new Set();
+    let pastNotes = new Set();
+
+    let currentMonth = new Date();
+    let myChartInstance;
+
+    document.getElementById("date").valueAsDate = new Date();
+    typeSelect.addEventListener("change", updateCategoryOptions);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const data = {
+        type: typeSelect.value,
+        date: document.getElementById("date").value,
+        category: categorySelect.value,
+        amount: parseInt(amountInput.value, 10),
+        note: noteInput.value,
+        tags: tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag !== '') // カンマ区切りで配列に
+      };
+
+      if (!data.type || !data.date || !data.category || isNaN(data.amount) || data.amount <= 0) {
+        alert("種別、日付、カテゴリ、金額は必須入力です。金額は正の数値を入力してください。");
+        return;
+      }
+
+      // 「その他」カテゴリが選択され、かつメモが入力されている場合は、そのメモをカスタムカテゴリとして記憶
+      if (data.category === "その他" && data.note) {
+          customCategories.add(data.note);
+      }
+      // メモの内容を記憶
+      if (data.note) {
+          pastNotes.add(data.note);
+      }
+
+
+      saveData(data);
+      loadAndDisplayData();
+      form.reset();
+      updateCategoryOptions(); // カテゴリ選択肢をリセット
+      updateMemoSuggestions(); // メモ候補を更新
+    });
+
+    function updateCategoryOptions() {
+      const type = typeSelect.value;
+      categorySelect.innerHTML = '<option value="">選択してください</option>'; // 初期オプション
+
+      // 通常のカテゴリを追加
+      if (categoryOptions[type]) {
+        categoryOptions[type].forEach(cat => {
+          const opt = document.createElement("option");
+          opt.value = cat;
+          opt.textContent = cat;
+          categorySelect.appendChild(opt);
+        });
+      } else {
+        categorySelect.innerHTML = '<option value="">まず種別を選んでください</option>';
+      }
+
+      // カスタムカテゴリを追加（「その他」カテゴリの場合のみ）
+      if (type === "支出") { // カスタムカテゴリは支出のみを想定
+          customCategories.forEach(cat => {
+              // 既存のカテゴリと重複しないようにチェック
+              if (!categoryOptions["支出"].includes(cat)) {
+                  const opt = document.createElement("option");
+                  opt.value = cat;
+                  opt.textContent = `その他 (${cat})`; // 識別しやすいように
+                  categorySelect.appendChild(opt);
+              }
+          });
+      }
+    }
+
+    // メモ入力候補の更新
+    function updateMemoSuggestions() {
+        memoSuggestionsDatalist.innerHTML = '';
+        pastNotes.forEach(note => {
+            const option = document.createElement('option');
+            option.value = note;
+            memoSuggestionsDatalist.appendChild(option);
+        });
+    }
+
+    function saveData(data) {
+      const existing = JSON.parse(localStorage.getItem("kakeibo")) || [];
+      existing.push(data);
+      localStorage.setItem("kakeibo", JSON.stringify(existing));
+    }
+
+    // 全ての家計簿データをロードし、カスタムカテゴリとメモ候補を更新
+    function loadAllDataForSuggestions() {
+        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+        allData.forEach(item => {
+            if (item.category === "その他" && item.note) {
+                customCategories.add(item.note);
+            }
+            if (item.note) {
+                pastNotes.add(item.note);
+            }
+        });
+        updateCategoryOptions(); // カスタムカテゴリを含むカテゴリ候補を更新
+        updateMemoSuggestions(); // メモ候補を更新
+    }
+
+    // 履歴データを読み込み、現在の月に合わせて表示する関数 (フィルタリング機能追加)
+    function loadAndDisplayData() {
+      let allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+      historyList.innerHTML = ""; // 既存の表示をクリア
+
+      // === フィルタリング処理 ===
+      const filterKeyword = filterKeywordInput.value.toLowerCase();
+      const filterType = filterTypeSelect.value;
+      const filterCategory = filterCategorySelect.value;
+      const filterAmountMin = parseInt(filterAmountMinInput.value, 10);
+      const filterAmountMax = parseInt(filterAmountMaxInput.value, 10);
+
+      const filteredData = allData.filter(item => {
+          // キーワードフィルター (メモまたはタグ)
+          const keywordMatch = !filterKeyword ||
+                               (item.note && item.note.toLowerCase().includes(filterKeyword)) ||
+                               (item.tags && item.tags.some(tag => tag.toLowerCase().includes(filterKeyword)));
+          
+          // 種別フィルター
+          const typeMatch = !filterType || item.type === filterType;
+
+          // カテゴリフィルター
+          const categoryMatch = !filterCategory || item.category === filterCategory;
+
+          // 金額範囲フィルター
+          const amountMatch = (isNaN(filterAmountMin) || item.amount >= filterAmountMin) &&
+                               (isNaN(filterAmountMax) || item.amount <= filterAmountMax);
+
+          return keywordMatch && typeMatch && categoryMatch && amountMatch;
+      });
+
+      // 現在表示中の月のデータをフィルタリング
+      const currentMonthYear = currentMonth.getFullYear();
+      const currentMonthMonth = currentMonth.getMonth(); // 0-indexed
+
+      // フィルタリングされたデータの中から、現在の月のデータのみを表示対象とする
+      const monthlyData = filteredData.filter(item => {
+        const itemDate = new Date(item.date);
+        return itemDate.getFullYear() === currentMonthYear && itemDate.getMonth() === currentMonthMonth;
+      });
+
+      monthlyData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const groupedData = {};
+      monthlyData.forEach(item => {
+        if (!groupedData[item.date]) {
+          groupedData[item.date] = [];
+        }
+        groupedData[item.date].push(item);
+      });
+
+      if (Object.keys(groupedData).length === 0) {
+        historyList.innerHTML = '<p style="text-align: center; color: #777; margin-top: 2em;">この月には履歴がありません。</p>';
+        if (filterKeyword || filterType || filterCategory || !isNaN(filterAmountMin) || !isNaN(filterAmountMax)) {
+            historyList.innerHTML += '<p style="text-align: center; color: #777; font-size: 0.9em;">（検索条件に合う項目が見つかりませんでした）</p>';
+        }
+      } else {
+        for (const date in groupedData) {
+          if (groupedData.hasOwnProperty(date)) {
+            const dailyItems = groupedData[date];
+
+            const dateHeader = document.createElement("div");
+            dateHeader.className = "date-header";
+            const [year, month, day] = date.split('-');
+            const dayOfWeek = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
+            const formattedDate = `${year}年${parseInt(month)}月${parseInt(day)}日 (${dayOfWeek})`;
+
+            dateHeader.textContent = formattedDate;
+            historyList.appendChild(dateHeader);
+
+            const ul = document.createElement("ul");
+            ul.className = "daily-list";
+
+            dailyItems.forEach((item) => {
+              // 削除時のインデックスは、フィルタリング前のallDataにおける元のインデックスを使う
+              // これはfilterされた配列のindexOfを使うと誤動作するので注意
+              // より堅牢な実装には、各データに一意のID（例: UUID）を付与することを推奨
+              const originalIndex = allData.findIndex(d => 
+                  d.type === item.type && 
+                  d.date === item.date && 
+                  d.category === item.category && 
+                  d.amount === item.amount &&
+                  d.note === item.note &&
+                  JSON.stringify(d.tags) === JSON.stringify(item.tags)
+              );
+
+
+              const li = document.createElement("li");
+              li.className = item.type === "支出" ? "expense-item" : "income-item";
+              li.innerHTML = `
+                <span class="item-details">
+                  <span class="item-type">${item.type}</span>
+                  <span class="item-category">${item.category}</span>
+                  <span class="item-amount">¥${item.amount.toLocaleString()}</span>
+                  ${item.note ? `<span class="item-note">${item.note}</span>` : ''}
+                  ${item.tags && item.tags.length > 0 ? `<span class="item-tags">${item.tags.map(tag => `#${tag}`).join(' ')}</span>` : ''}
+                </span>
+                <button class="delete-btn" data-index="${originalIndex}">削除</button>
+              `;
+              ul.appendChild(li);
+            });
+            historyList.appendChild(ul);
+          }
+        }
+      }
+
+      document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const index = parseInt(e.target.dataset.index, 10);
+          deleteData(index);
+        });
+      });
+
+      updateMonthDisplay();
+      updateSummary(monthlyData); // フィルタリングされたデータではなく、現在の月のデータで集計
+      updateCharts(monthlyData); // フィルタリングされたデータではなく、現在の月のデータでグラフ
+      updateBudgetStatus(monthlyData); // 予算実績を更新
+    }
+
+    function deleteData(index) {
+      const existing = JSON.parse(localStorage.getItem("kakeibo")) || [];
+      if (confirm("この項目を削除してもよろしいですか？")) {
+        existing.splice(index, 1);
+        localStorage.setItem("kakeibo", JSON.stringify(existing));
+        loadAndDisplayData();
+        loadAllDataForSuggestions(); // 削除後にメモ・カテゴリ候補を更新
+      }
+    }
+
+    function updateMonthDisplay() {
+      currentMonthDisplay.textContent = currentMonth.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' });
+    }
+
+    prevMonthBtn.addEventListener("click", () => {
+      currentMonth.setMonth(currentMonth.getMonth() - 1);
+      loadAndDisplayData();
+    });
+
+    nextMonthBtn.addEventListener("click", () => {
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+      loadAndDisplayData();
+    });
+
+    function updateSummary(data) {
+      let totalIncome = 0;
+      let totalExpense = 0;
+
+      data.forEach(item => {
+        if (item.type === "収入") {
+          totalIncome += item.amount;
+        } else if (item.type === "支出") {
+          totalExpense += item.amount;
+        }
+      });
+
+      totalIncomeSpan.textContent = `¥${totalIncome.toLocaleString()}`;
+      totalExpenseSpan.textContent = `¥${totalExpense.toLocaleString()}`;
+      balanceSpan.textContent = `¥${(totalIncome - totalExpense).toLocaleString()}`;
+    }
+
+    function updateCharts(monthlyData) {
+      if (myChartInstance) {
+        myChartInstance.destroy();
+      }
+
+      const activeTab = document.querySelector('.chart-tabs button.active').id;
+
+      if (activeTab === 'pieChartTab') {
+        renderPieChart(monthlyData);
+      } else if (activeTab === 'barChartTab') {
+        renderMonthlyBarChart();
+      }
+    }
+
+    function renderPieChart(monthlyData) {
+      const expenseByCategory = {};
+      monthlyData.filter(item => item.type === "支出").forEach(item => {
+        expenseByCategory[item.category] = (expenseByCategory[item.category] || 0) + item.amount;
+      });
+
+      const labels = Object.keys(expenseByCategory);
+      const dataValues = Object.values(expenseByCategory);
+      const backgroundColors = generateColors(labels.length);
+
+      myChartInstance = new Chart(myChartCanvas, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: backgroundColors,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            title: {
+              display: true,
+              text: '月間支出カテゴリ別内訳'
+            }
+          }
+        }
+      });
+    }
+
+    function renderMonthlyBarChart() {
+        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+        const monthlySummary = {};
+
+        allData.forEach(item => {
+            const itemDate = new Date(item.date);
+            const yearMonth = `${itemDate.getFullYear()}-${(itemDate.getMonth() + 1).toString().padStart(2, '0')}`;
+
+            if (!monthlySummary[yearMonth]) {
+                monthlySummary[yearMonth] = { income: 0, expense: 0 };
+            }
+
+            if (item.type === "収入") {
+                monthlySummary[yearMonth].income += item.amount;
+            } else if (item.type === "支出") {
+                monthlySummary[yearMonth].expense += item.amount;
+            }
+        });
+
+        const sortedMonths = Object.keys(monthlySummary).sort();
+
+        const incomes = sortedMonths.map(month => monthlySummary[month].income);
+        const expenses = sortedMonths.map(month => monthlySummary[month].expense);
+
+        myChartInstance = new Chart(myChartCanvas, {
+            type: 'bar',
+            data: {
+                labels: sortedMonths,
+                datasets: [
+                    {
+                        label: '収入',
+                        data: incomes,
+                        backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '支出',
+                        data: expenses,
+                        backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: '月別収支推移'
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: false // 必要に応じてtrue
+                    },
+                    y: {
+                        beginAtZero: true,
+                        stacked: false // 必要に応じてtrue
+                    }
+                }
+            }
+        });
+    }
+
+    function generateColors(numColors) {
+      const colors = [];
+      const hueStep = 360 / numColors;
+      for (let i = 0; i < numColors; i++) {
+        const hue = i * hueStep;
+        colors.push(`hsl(${hue}, 70%, 60%)`);
+      }
+      return colors;
+    }
+
+    pieChartTab.addEventListener('click', () => {
+      pieChartTab.classList.add('active');
+      barChartTab.classList.remove('active');
+      updateCharts(filterAndSortMonthlyData()); // 現在表示中の月のデータを渡す
+    });
+
+    barChartTab.addEventListener('click', () => {
+      barChartTab.classList.add('active');
+      pieChartTab.classList.remove('active');
+      updateCharts(filterAndSortMonthlyData()); // 現在表示中の月のデータを渡す
+    });
+
+    // filterAndSortMonthlyData関数は、loadAndDisplayData内の月データ抽出ロジックと同じもの
+    // chart.jsの更新時にも同じデータセットを渡すために抽出
+    function filterAndSortMonthlyData() {
+        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+        const currentMonthYear = currentMonth.getFullYear();
+        const currentMonthMonth = currentMonth.getMonth(); // 0-indexed
+
+        return allData.filter(item => {
+            const itemDate = new Date(item.date);
+            return itemDate.getFullYear() === currentMonthYear && itemDate.getMonth() === currentMonthMonth;
+        });
+    }
+
+
+    exportCsvBtn.addEventListener('click', () => {
+        const allData = JSON.parse(localStorage.getItem("kakeibo")) || [];
+        if (allData.length === 0) {
+            alert("エクスポートするデータがありません。");
+            return;
+        }
+
+        // CSVヘッダー
+        const headers = ["日付", "種別", "カテゴリ", "金額", "メモ", "タグ"];
+        // データ行の生成
+        const csvRows = allData.map(item => {
+            // カンマを含むメモやタグはダブルクォートで囲む
+            const escapeCsv = (value) => {
+                if (value === null || value === undefined) return '';
+                let stringValue = String(value);
+                if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                    return `"${stringValue.replace(/"/g, '""')}"`;
+                }
+                return stringValue;
+            };
+
+            const tagsString = item.tags ? item.tags.join(',') : '';
+            return [
+                escapeCsv(item.date),
+                escapeCsv(item.type),
+                escapeCsv(item.category),
+                escapeCsv(item.amount),
+                escapeCsv(item.note),
+                escapeCsv(tagsString)
+            ].join(',');
+        });
+
+        // CSVコンテンツを結合
+        const csvContent = [headers.join(','), ...csvRows].join('\n');
+
+        // Blobオブジェクトを作成
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+        // ダウンロードリンクを作成してクリック
+        const link = document.createElement('a');
+        if (link.download !== undefined) { // HTML5 download attribute
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '家計簿データ.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else { // Fallback for older browsers
+            alert("お使いのブラウザはCSVエクスポートに対応していません。");
+        }
+    });
+
+    // 固定支出の機能
+    function saveFixedExpenses(fixedExpenses) {
+        localStorage.setItem("fixedExpenses", JSON.stringify(fixedExpenses));
+    }
+
+    function loadFixedExpenses() {
+        return JSON.parse(localStorage.getItem("fixedExpenses")) || [];
+    }
+
+    function renderFixedExpenseList() {
+        const fixedExpenses = loadFixedExpenses();
+        fixedExpenseList.innerHTML = '';
+        if (fixedExpenses.length === 0) {
+            fixedExpenseList.innerHTML = '<p style="text-align: center; color: #777; font-size: 0.9em;">登録済みの固定支出はありません。</p>';
+            return;
+        }
+        fixedExpenses.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${item.category}: ¥${item.amount.toLocaleString()} (${item.note})</span>
+                <button class="delete-fixed-btn" data-index="${index}">削除</button>
+            `;
+            fixedExpenseList.appendChild(li);
+        });
+
+        document.querySelectorAll('.delete-fixed-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = parseInt(e.target.dataset.index, 10);
+                deleteFixedExpense(index);
+            });
+        });
+    }
+
+    function deleteFixedExpense(index) {
+        let fixedExpenses = loadFixedExpenses();
+        if (confirm("この固定支出を削除してもよろしいですか？")) {
+            fixedExpenses.splice(index, 1);
+            saveFixedExpenses(fixedExpenses);
+            renderFixedExpenseList();
+        }
+    }
+
+    addFixedExpenseBtn.addEventListener('click', () => {
+        const category = fixedExpenseCategorySelect.value;
+        const amount = parseInt(fixedExpenseAmountInput.value, 10);
+        const note = fixedExpenseNoteInput.value;
+
+        if (!category || isNaN(amount) || amount <= 0) {
+            alert("カテゴリと金額は必須入力です。金額は正の数値を入力してください。");
+            return;
+        }
+
+        const fixedExpenses = loadFixedExpenses();
+        fixedExpenses.push({ category, amount, note });
+        saveFixedExpenses(fixedExpenses);
+        renderFixedExpenseList();
+        fixedExpenseAmountInput.value = '';
+        fixedExpenseNoteInput.value = '';
+        fixedExpenseCategorySelect.value = '';
+    });
+
+    addMonthlyFixedExpensesBtn.addEventListener('click', () => {
+        const fixedExpenses = loadFixedExpenses();
+        if (fixedExpenses.length === 0) {
+            alert("登録済みの固定支出がありません。");
+            return;
+        }
+
+        if (!confirm("今月に登録済みの固定支出をすべて追加しますか？（重複登録にご注意ください）")) {
+            return;
+        }
+
+        const today = new Date();
+        const dateString = today.toISOString().slice(0, 10); // 今日の日付をYYYY-MM-DD形式で取得
+
+        let addedCount = 0;
+        fixedExpenses.forEach(fixedItem => {
+            const data = {
+                type: "支出",
+                date: dateString, // 今日の日付として追加
+                category: fixedItem.category,
+                amount: fixedItem.amount,
+                note: `[固定] ${fixedItem.note || fixedItem.category}`, // 固定支出であることを明示
+                tags: ['固定費'] // 固定費タグを追加
+            };
+            saveData(data);
+            addedCount++;
+        });
+        alert(`${addedCount}件の固定支出を今月に追加しました。`);
+        loadAndDisplayData();
+    });
+
+
+    // 予算設定の機能
+    function saveBudgets(budgets) {
+        localStorage.setItem("budgets", JSON.stringify(budgets));
+    }
+
+    function loadBudgets() {
+        return JSON.parse(localStorage.getItem("budgets")) || {}; // オブジェクトとして保存
+    }
+
+    function renderBudgetList() {
+        const budgets = loadBudgets();
+        budgetList.innerHTML = '';
+        const budgetCategories = Object.keys(budgets);
+
+        if (budgetCategories.length === 0) {
+            budgetList.innerHTML = '<p style="text-align: center; color: #777; font-size: 0.9em;">予算が設定されていません。</p>';
+            return;
+        }
+
+        budgetCategories.forEach(category => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${category}: ¥${budgets[category].toLocaleString()}</span>
+                <button class="delete-budget-btn" data-category="${category}">削除</button>
+            `;
+            budgetList.appendChild(li);
+        });
+
+        document.querySelectorAll('.delete-budget-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const categoryToDelete = e.target.dataset.category;
+                deleteBudget(categoryToDelete);
+            });
+        });
+    }
+
+    function deleteBudget(category) {
+        let budgets = loadBudgets();
+        if (confirm(`${category}の予算を削除してもよろしいですか？`)) {
+            delete budgets[category];
+            saveBudgets(budgets);
+            renderBudgetList();
+            updateBudgetStatus(filterAndSortMonthlyData()); // 予算削除後、実績も更新
+        }
+    }
+
+    setBudgetBtn.addEventListener('click', () => {
+        const category = budgetCategorySelect.value;
+        const amount = parseInt(budgetAmountInput.value, 10);
+
+        if (!category || isNaN(amount) || amount < 0) { // 予算は0も許容
+            alert("カテゴリと予算額は必須入力です。予算額は数値で入力してください。");
+            return;
+        }
+
+        let budgets = loadBudgets();
+        budgets[category] = amount; // 上書き保存
+        saveBudgets(budgets);
+        renderBudgetList();
+        budgetAmountInput.value = '';
+        budgetCategorySelect.value = '';
+        updateBudgetStatus(filterAndSortMonthlyData()); // 予算設定後、実績も更新
+    });
+
+    // 予算設定カテゴリの初期化
+    function initBudgetCategorySelect() {
+        const expenseCategories = categoryOptions["支出"];
+        budgetCategorySelect.innerHTML = '<option value="">選択してください</option>';
+        expenseCategories.forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = cat;
+            budgetCategorySelect.appendChild(opt);
+        });
+         // カスタムカテゴリも追加
+        customCategories.forEach(cat => {
+            if (!expenseCategories.includes(cat)) {
+                const opt = document.createElement("option");
+                opt.value = cat;
+                opt.textContent = `その他 (${cat})`;
+                budgetCategorySelect.appendChild(opt);
+            }
+        });
+    }
+
+
+    function updateBudgetStatus(monthlyData) {
+        const budgets = loadBudgets();
+        budgetStatusDiv.innerHTML = '<h3>今月の予算実績</h3>';
+        let hasBudget = false;
+
+        const monthlyExpensesByCategory = {};
+        monthlyData.filter(item => item.type === "支出").forEach(item => {
+            // カスタムカテゴリの場合、メモの内容をカテゴリとして集計
+            const actualCategory = (item.category === "その他" && item.note && customCategories.has(item.note)) ? item.note : item.category;
+            monthlyExpensesByCategory[actualCategory] = (monthlyExpensesByCategory[actualCategory] || 0) + item.amount;
+        });
+
+        for (const category in budgets) {
+            hasBudget = true;
+            const budgetAmount = budgets[category];
+            const actualExpense = monthlyExpensesByCategory[category] || 0;
+            const remaining = budgetAmount - actualExpense;
+            const isWarning = remaining < 0; // 予算オーバー
+
+            const budgetItem = document.createElement('div');
+            budgetItem.className = `budget-item ${isWarning ? 'warning' : ''}`;
+            budgetItem.innerHTML = `
+                <span>${category}</span>
+                <span>¥${actualExpense.toLocaleString()} / ¥${budgetAmount.toLocaleString()} (${remaining >= 0 ? '残り' : 'オーバー'} ¥${Math.abs(remaining).toLocaleString()})</span>
+            `;
+            budgetStatusDiv.appendChild(budgetItem);
+        }
+
+        if (!hasBudget) {
+            budgetStatusDiv.appendChild(noBudgetSetMessage); // 予算が設定されていませんメッセージを表示
+        } else {
+            noBudgetSetMessage.remove(); // 予算が設定されていればメッセージを削除
+        }
+    }
+
+    // フィルタリングカテゴリの初期化
+    function initFilterCategorySelect() {
+        const allCategories = new Set();
+        // 既存のカテゴリとカスタムカテゴリを統合
+        categoryOptions["支出"].forEach(cat => allCategories.add(cat));
+        categoryOptions["収入"].forEach(cat => allCategories.add(cat));
+        customCategories.forEach(cat => allCategories.add(cat));
+
+        filterCategorySelect.innerHTML = '<option value="">すべて</option>';
+        Array.from(allCategories).sort().forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = cat;
+            filterCategorySelect.appendChild(opt);
+        });
+    }
+
+    searchBtn.addEventListener('click', loadAndDisplayData);
+    resetFilterBtn.addEventListener('click', () => {
+        filterKeywordInput.value = '';
+        filterTypeSelect.value = '';
+        filterCategorySelect.value = '';
+        filterAmountMinInput.value = '';
+        filterAmountMaxInput.value = '';
+        loadAndDisplayData(); // フィルターをリセットして再表示
+    });
+
+    // 初期化関数
+    function init() {
+      loadAllDataForSuggestions(); // 最初にすべてのデータをロードしてカスタムカテゴリとメモ候補を更新
+      updateCategoryOptions(); // 種別選択肢を初期化
+      initFilterCategorySelect(); // フィルタカテゴリを初期化
+      initBudgetCategorySelect(); // 予算カテゴリを初期化
+      renderFixedExpenseList(); // 固定支出リストをレンダリング
+      renderBudgetList(); // 予算リストをレンダリング
+      loadAndDisplayData(); // データを読み込んで表示
+      updateCharts(filterAndSortMonthlyData()); // 初期グラフをレンダリング
+    }
+
+    // ページロード時に初期化
+    init();
+
+    // フッターナビゲーションのスクロール機能
+    document.querySelectorAll('.footer-nav .nav-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const targetId = e.currentTarget.dataset.target;
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                // スムーズスクロール
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+  </script>
+</body>
+</html>
