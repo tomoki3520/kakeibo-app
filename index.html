@@ -510,6 +510,7 @@
     </label>
     <button type="button" id="importCsvBtn">CSVをインポート</button>
   </div>
+
   <h2 id="budget-section-h2">予算設定</h2>
   <div class="budget-section">
     <h3>月間予算を設定</h3>
@@ -552,6 +553,10 @@
   <div class="month-navigation">
     <button id="prevMonth">&lt;</button>
     <span id="currentMonthDisplay" class="month-display"></span>
+    <div style="display: flex; gap: 5px;">
+        <select id="selectYear" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;"></select>
+        <select id="selectMonth" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;"></select>
+    </div>
     <button id="nextMonth">&gt;</button>
   </div>
 
@@ -670,9 +675,12 @@
     const myChartCanvas = document.getElementById("myChart");
     const exportCsvBtn = document.getElementById("exportCsvBtn");
 
-    // ここから追加
     const csvFileInput = document.getElementById("csvFileInput");
     const importCsvBtn = document.getElementById("importCsvBtn");
+
+    // ここから追加
+    const selectYear = document.getElementById("selectYear");
+    const selectMonth = document.getElementById("selectMonth");
     // ここまで追加
 
     // 固定支出関連のDOM要素
@@ -709,7 +717,7 @@
         "税金・年金", "その他"
       ],
       "収入": [
-        "給与", "副業", "お小遣い", "配当・投資", "賞与", "その他" // ここに「賞与」を追加
+        "給与", "副業", "お小遣い", "配当・投資", "賞与", "その他"
       ]
     };
 
@@ -1036,30 +1044,66 @@
       const month = currentMonth.getMonth() + 1; // getMonth()は0から始まるため+1
       currentMonthDisplay.textContent = `${year}年${month}月`;
 
-      // 月表示部分をクリック可能にする
-      currentMonthDisplay.style.cursor = 'pointer';
-      currentMonthDisplay.style.textDecoration = 'underline';
+      // ドロップダウンを現在の月に合わせる
+      selectYear.value = year;
+      selectMonth.value = month;
     }
-
-    // ここから追加
-    // 月表示をクリックしたら履歴セクションにスクロールするイベントリスナー
-    currentMonthDisplay.addEventListener('click', () => {
-        const historySection = document.getElementById('history-section-h2'); // 履歴の見出しH2
-        if (historySection) {
-            historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
-    // ここまで追加
 
     prevMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() - 1);
       await loadAndDisplayData();
+      updateMonthDropdowns(); // ドロップダウンも更新
     });
 
     nextMonthBtn.addEventListener("click", async () => {
       currentMonth.setMonth(currentMonth.getMonth() + 1);
       await loadAndDisplayData();
+      updateMonthDropdowns(); // ドロップダウンも更新
     });
+
+    // ここから追加
+    // ドロップダウンリストに年と月を生成する関数
+    async function populateMonthDropdowns() {
+        // 現在から過去5年、未来1年分の年を選択肢に入れる
+        const currentYear = new Date().getFullYear();
+        for (let i = currentYear - 5; i <= currentYear + 1; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i}年`;
+            selectYear.appendChild(option);
+        }
+
+        // 1月から12月までを選択肢に入れる
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i}月`;
+            selectMonth.appendChild(option);
+        }
+
+        // 初期表示を現在の月に合わせる
+        updateMonthDropdowns();
+
+        // ドロップダウンが変更されたときのイベントリスナー
+        selectYear.addEventListener('change', async () => {
+            currentMonth.setFullYear(parseInt(selectYear.value));
+            await loadAndDisplayData();
+            updateMonthDisplay(); // 月表示（2025年7月）を更新
+        });
+
+        selectMonth.addEventListener('change', async () => {
+            currentMonth.setMonth(parseInt(selectMonth.value) - 1); // getMonth()は0始まりのため-1
+            await loadAndDisplayData();
+            updateMonthDisplay(); // 月表示（2025年7月）を更新
+        });
+    }
+
+    // ドロップダウンの選択をcurrentMonthに合わせる関数
+    function updateMonthDropdowns() {
+        selectYear.value = currentMonth.getFullYear();
+        selectMonth.value = currentMonth.getMonth() + 1;
+    }
+    // ここまで追加
 
     function updateSummary(data) {
       let totalIncome = 0;
@@ -1277,7 +1321,6 @@
         }
     });
 
-    // ここから追加
     importCsvBtn.addEventListener('click', () => {
         const file = csvFileInput.files[0];
         if (!file) {
@@ -1361,7 +1404,6 @@
             }
         }
     }
-    // ここまで追加
 
     // 固定支出の機能
     /**
@@ -1745,6 +1787,7 @@
       await renderBudgetList();
       await loadAndDisplayData();
       updateCharts(await filterAndSortMonthlyData());
+      await populateMonthDropdowns(); // ドロップダウンを初期化
     }
 
     // ページロード時に初期化
