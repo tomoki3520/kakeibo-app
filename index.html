@@ -60,54 +60,6 @@
     <button type="button" id="cancelEditBtn" style="display: none;">キャンセル</button>
   </form>
 
-  <h2 id="budget-section-h2">予算設定</h2>
-  <div class="budget-section">
-    <h3>月間予算を設定</h3>
-    <label>カテゴリ：
-      <select id="budgetCategorySelect" required>
-        </select>
-    </label>
-    <label>予算額（円）：
-      <input type="number" id="budgetAmountInput" required min="0" />
-    </label>
-    <button type="button" id="setBudgetBtn" class="budget-btn">予算を設定</button>
-
-    <h3>現在の予算設定</h3>
-    <ul id="budgetList">
-      </ul>
-  </div>
-
-  <h2 id="recurring-entry-section-h2">定期的な記録の登録</h2>
-  <div class="recurring-entry-section">
-    <label>種別：
-      <select id="recurringType" required>
-        <option value="">選択してください</option>
-        <option value="支出">支出</option>
-        <option value="収入">収入</option>
-      </select>
-    </label>
-    <label>カテゴリ：
-      <select id="recurringCategory" required>
-        </select>
-    </label>
-    <label>金額（円）：
-      <input type="number" id="recurringAmount" required min="0" />
-    </label>
-    <label>メモ：
-      <input type="text" id="recurringNote" />
-    </label>
-    <label>追加日（毎月）：
-      <input type="number" id="recurringDay" required min="1" max="31" placeholder="例: 25 (毎月25日)" />
-    </label>
-    <button type="button" id="addRecurringEntryBtn" class="add-recurring-entry-btn">定期的な記録を登録</button>
-
-    <h3>登録済みの定期的な記録</h3>
-    <ul id="recurringEntryList">
-      </ul>
-    <button type="button" id="addMonthlyRecurringEntriesBtn">今月に定期的な記録を一括追加</button>
-  </div>
-
-
   <h2 id="history-section-h2">履歴</h2>
   <div class="month-navigation">
     <button id="prevMonth">&lt;</button>
@@ -175,6 +127,53 @@
     <canvas id="myChart"></canvas>
   </div>
 
+  <h2 id="budget-section-h2">予算設定</h2>
+  <div class="budget-section">
+    <h3>月間予算を設定</h3>
+    <label>カテゴリ：
+      <select id="budgetCategorySelect" required>
+        </select>
+    </label>
+    <label>予算額（円）：
+      <input type="number" id="budgetAmountInput" required min="0" />
+    </label>
+    <button type="button" id="setBudgetBtn" class="budget-btn">予算を設定</button>
+
+    <h3>現在の予算設定</h3>
+    <ul id="budgetList">
+      </ul>
+  </div>
+
+  <h2 id="recurring-entry-section-h2">定期的な記録の登録</h2>
+  <div class="recurring-entry-section">
+    <label>種別：
+      <select id="recurringType" required>
+        <option value="">選択してください</option>
+        <option value="支出">支出</option>
+        <option value="収入">収入</option>
+      </select>
+    </label>
+    <label>カテゴリ：
+      <select id="recurringCategory" required>
+        </select>
+    </label>
+    <label>金額（円）：
+      <input type="number" id="recurringAmount" required min="0" />
+    </label>
+    <label>メモ：
+      <input type="text" id="recurringNote" />
+    </label>
+    <label>追加日（毎月）：
+      <input type="number" id="recurringDay" required min="1" max="31" placeholder="例: 25 (毎月25日)" />
+    </label>
+    <button type="button" id="addRecurringEntryBtn" class="add-recurring-entry-btn">定期的な記録を登録</button>
+
+    <h3>登録済みの定期的な記録</h3>
+    <ul id="recurringEntryList">
+      </ul>
+    <button type="button" id="addMonthlyRecurringEntriesBtn">今月に定期的な記録を一括追加</button>
+  </div>
+
   <h2 id="import-section-h2">CSVデータのインポート</h2>
   <div class="import-section">
     <label for="csvFileInput">
@@ -191,14 +190,6 @@
         <i class="material-icons">add_circle_outline</i>
         <span>入力</span>
     </button>
-    <button class="nav-button" data-target="budget-section-h2">
-        <i class="material-icons">account_balance_wallet</i>
-        <span>予算</span>
-    </button>
-    <button class="nav-button" data-target="recurring-entry-section-h2">
-        <i class="material-icons">event_note</i>
-        <span>定期</span>
-    </button>
     <button class="nav-button" data-target="history-section-h2">
         <i class="material-icons">history</i>
         <span>履歴</span>
@@ -206,6 +197,14 @@
     <button class="nav-button" data-target="analysis-section-h2">
         <i class="material-icons">bar_chart</i>
         <span>分析</span>
+    </button>
+    <button class="nav-button" data-target="budget-section-h2">
+        <i class="material-icons">account_balance_wallet</i>
+        <span>予算</span>
+    </button>
+    <button class="nav-button" data-target="recurring-entry-section-h2">
+        <i class="material-icons">event_note</i>
+        <span>定期</span>
     </button>
   </div>
 
