@@ -58,16 +58,7 @@
 
     <button type="submit">追加</button>
     <button type="button" id="cancelEditBtn" style="display: none;">キャンセル</button>
-</form>
-
-  <h2>CSVデータのインポート</h2>
-  <div class="import-section">
-    <label for="csvFileInput">
-      CSVファイルを選択してインポート:
-      <input type="file" id="csvFileInput" accept=".csv"/>
-    </label>
-    <button type="button" id="importCsvBtn">CSVをインポート</button>
-  </div>
+  </form>
 
   <h2 id="budget-section-h2">予算設定</h2>
   <div class="budget-section">
@@ -156,8 +147,6 @@
 
   <ul id="history"></ul>
 
-  <button id="exportCsvBtn">CSVでエクスポート</button>
-
   <h2 id="analysis-section-h2">分析</h2>
   <div class="summary-section">
     <div class="summary-item income">
@@ -186,6 +175,17 @@
     <canvas id="myChart"></canvas>
   </div>
 
+  <h2 id="import-section-h2">CSVデータのインポート</h2>
+  <div class="import-section">
+    <label for="csvFileInput">
+      CSVファイルを選択してインポート:
+      <input type="file" id="csvFileInput" accept=".csv"/>
+    </label>
+    <button type="button" id="importCsvBtn">CSVをインポート</button>
+  </div>
+
+  <button id="exportCsvBtn">CSVでエクスポート</button>
+
   <div class="footer-nav">
     <button class="nav-button" data-target="top">
         <i class="material-icons">add_circle_outline</i>
@@ -213,4 +213,3 @@
 
 </body>
 </html>
-
