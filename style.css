@@ -1,0 +1,453 @@
+body {
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  padding: 1.5em;
+  padding-bottom: 60px; /* フッターナビゲーションの高さ分、下部に余白を追加 */
+  max-width: 480px;
+  margin: auto;
+  background: #f0f2f5;
+  color: #333;
+}
+
+h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 1.5em;
+  font-size: 2em;
+}
+
+/* 各セクションの開始位置を示すためにIDにpadding-topとmargin-topを追加 */
+h2 {
+  color: #2c3e50;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  padding-top: 60px; /* フッターの高さ分、paddingを追加して要素が隠れないように */
+}
+/* 最初のH2（固定支出の登録）はフォームの後なので、padding-topは不要 */
+h2:first-of-type {
+    padding-top: 0;
+}
+
+
+form, .fixed-expense-section, .budget-section, .filter-section, .import-section, .recurring-entry-section { /* formに加えて新しいセクションにもスタイル適用 */
+  background: #ffffff;
+  padding: 1.5em;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom: 2em;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+form label, .fixed-expense-section label, .budget-section label, .filter-section label, .import-section label, .recurring-entry-section label { /* 全てのラベルにスタイル適用 */
+  display: block;
+  margin-bottom: 0.8em;
+  font-weight: bold;
+}
+
+form label input,
+form label select,
+.fixed-expense-section label input,
+.fixed-expense-section label select,
+.budget-section label input, /* 予算入力フィールド */
+.budget-section label select, /* 予算カテゴリ選択 */
+.filter-section label input, /* 検索入力フィールド */
+.filter-section label select,
+.import-section label input[type="file"], /* CSVインポートファイル入力フィールド */
+.recurring-entry-section label input,
+.recurring-entry-section label select {
+  display: block;
+  width: calc(100% - 1em);
+  padding: 0.7em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+  box-sizing: border-box;
+  margin-top: 0.2em;
+}
+
+button[type="submit"], .add-fixed-expense-btn, #addMonthlyRecurringEntriesBtn,
+.budget-btn, #searchBtn, #resetFilterBtn, #importCsvBtn, .add-recurring-entry-btn { /* 全てのボタンの共通スタイル */
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.8em;
+  cursor: pointer;
+  margin-top: 0.5em;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+  width: 100%;
+}
+
+button[type="submit"]:hover, .add-fixed-expense-btn:hover, #addMonthlyRecurringEntriesBtn:hover,
+.budget-btn:hover, #searchBtn:hover, #resetFilterBtn:hover, #importCsvBtn:hover, .add-recurring-entry-btn:hover {
+  background: #218838;
+}
+
+#searchBtn { background: #007bff; }
+#searchBtn:hover { background: #0056b3; }
+#resetFilterBtn { background: #6c757d; }
+#resetFilterBtn:hover { background: #5a6268; }
+#importCsvBtn { background: #007bff; } /* インポートボタンも青 */
+#importCsvBtn:hover { background: #0056b3; }
+
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+/* 日付見出しのスタイル */
+.date-header {
+  background-color: #e0e0e0;
+  padding: 0.8em 1em;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+  color: #555;
+  border-bottom: 1px solid #ddd;
+  border-radius: 4px 4px 0 0;
+}
+
+/* 各日のリストコンテナ */
+.daily-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* 各履歴アイテムのスタイル */
+.daily-list li {
+  background: #ffffff;
+  margin: 0.2em 0;
+  padding: 0.8em 1em;
+  border-left: 5px solid;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+/* 支出と収入のボーダー色 */
+.expense-item {
+  border-color: #dc3545;
+}
+
+.income-item {
+  border-color: #28a745;
+}
+
+/* 各項目詳細のスタイル */
+.item-details {
+  flex-grow: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em 0.8em;
+  margin-right: 1em;
+  align-items: baseline;
+}
+
+.item-type {
+  font-weight: bold;
+  color: #333;
+  min-width: 45px;
+  flex-shrink: 0;
+}
+.item-category {
+  color: #333;
+  font-weight: 500;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+.item-amount {
+  font-weight: bold;
+  color: #000;
+  margin-left: auto;
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+.item-note {
+  font-size: 0.9em;
+  color: #666;
+  flex-basis: 100%;
+  margin-top: 0.3em;
+}
+.item-tags { /* タグの表示スタイル */
+  font-size: 0.8em;
+  color: #007bff;
+  flex-basis: 100%;
+  margin-top: 0.3em;
+}
+
+/* 削除ボタンのスタイル */
+.delete-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  flex-shrink: 0;
+  margin-left: 0.5em;
+  align-self: center;
+  transition: background 0.2s ease;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+/* 月切り替えと分析セクション */
+.month-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2em;
+  margin-bottom: 1.5em;
+  background: #ffffff;
+  padding: 0.8em;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  position: relative; /* monthPickerを絶対配置するため */
+}
+
+.month-navigation button {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: #2c3e50;
+  cursor: pointer;
+  padding: 0.2em 0.5em;
+}
+
+.month-display {
+  font-size: 1.3em;
+  font-weight: bold;
+  color: #2c3e50;
+  cursor: pointer;
+  /* クリックできることを示す */
+  text-decoration: underline;
+  /* クリックできることを示す */
+}
+
+.summary-section {
+  background: #ffffff;
+  padding: 1.2em;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 2em;
+  text-align: center;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5em;
+  font-size: 1.1em;
+}
+.summary-item span:first-child {
+  font-weight: bold;
+}
+.summary-item.income span:last-child { color: #28a745; }
+.summary-item.expense span:last-child { color: #dc3545; }
+.summary-item.total span:last-child { font-weight: bold; color: #2c3e50; }
+
+/* 予算表示のスタイル */
+.budget-status {
+    margin-top: 1.5em;
+    padding-top: 1em;
+    border-top: 1px solid #eee;
+}
+.budget-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5em;
+    font-size: 0.95em;
+}
+.budget-item.warning {
+    color: #dc3545; /* 予算オーバー警告色 */
+    font-weight: bold;
+}
+.budget-item span:first-child {
+    font-weight: bold;
+}
+
+
+.chart-tabs {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1.5em;
+  background: #ffffff;
+  padding: 0.5em;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.chart-tabs button {
+  flex: 1;
+  padding: 0.8em 0.5em;
+  border: none;
+  background: none;
+  font-size: 1em;
+  cursor: pointer;
+  color: #666;
+  border-radius: 6px;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.chart-tabs button.active {
+  background: #28a745;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.chart-tabs button:hover:not(.active) {
+  background: #f0f0f0;
+}
+
+.chart-container {
+  background: #ffffff;
+  padding: 1.5em;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom: 2em;
+}
+.chart-container canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* CSVエクスポートボタンのスタイル */
+#exportCsvBtn {
+    width: 100%;
+    padding: 0.8em;
+    background: #007bff; /* 青色 */
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-top: 1em;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+#exportCsvBtn:hover {
+    background: #0056b3; /* ホバーで少し暗く */
+}
+
+/* 定期支出/収入リストのスタイル */
+#recurringEntryList {
+    list-style: none;
+    padding: 0;
+}
+#recurringEntryList li {
+    background: #f8f8f8;
+    padding: 0.8em 1em;
+    margin-bottom: 0.5em;
+    border-left: 5px solid; /* 種別によって色を変える */
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+#recurringEntryList li.expense-item { border-color: #dc3545; }
+#recurringEntryList li.income-item { border-color: #28a745; }
+
+#recurringEntryList li .delete-recurring-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.3em 0.6em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7em;
+    transition: background 0.2s ease;
+}
+#recurringEntryList li .delete-recurring-btn:hover {
+    background: #c82333;
+}
+
+/* 検索フィルタリングセクション */
+.filter-section .filter-buttons {
+    display: flex;
+    gap: 0.5em;
+}
+.filter-section .filter-buttons button {
+    flex: 1;
+}
+
+/* 入力候補リスト */
+.autocomplete-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 0.5em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    max-height: 150px;
+    overflow-y: auto;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    position: absolute; /* 親要素が relative であることを想定 */
+    width: calc(100% - 3em); /* body padding 考慮 */
+    z-index: 100; /* 他の要素より手前に表示 */
+}
+.autocomplete-list li {
+    padding: 0.8em 1em;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+.autocomplete-list li:last-child {
+    border-bottom: none;
+}
+.autocomplete-list li:hover {
+    background-color: #f0f0f0;
+}
+
+.form-group-relative {
+    position: relative;
+}
+
+/* --- 新しいCSS: フッターナビゲーション --- */
+.footer-nav {
+    position: fixed; /* 画面下部に固定 */
+    bottom: 0; /* 下端に配置 */
+    left: 0;
+    width: 100%;
+    max-width: 480px; /* bodyのmax-widthに合わせる */
+    left: 50%;
+    transform: translateX(-50%); /* 中央揃え */
+    background: #343a40; /* ダーク系の背景色 */
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.2); /* 上部に影 */
+    z-index: 1000; /* 他の要素より手前に表示 */
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.footer-nav button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 0.8em;
+    padding: 0.5em 0.2em;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1; /* 等幅で配置 */
+    transition: color 0.2s ease;
+}
+
+.footer-nav button:hover {
+    color: #28a745; /* ホバーでアクセントカラー */
+}
+
+/* アイコン部分のスタイル (Material Iconsなどを使う場合はフォントサイズで調整) */
+.footer-nav button i {
+    font-size: 1.4em; /* アイコンのサイズ */
+    margin-bottom: 3px;
+}
