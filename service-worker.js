@@ -1,10 +1,10 @@
 // 定数定義
-const CACHE_NAME = 'kakeibo-app-cache-v2'; // キャッシュバージョンを更新
+const CACHE_NAME = 'kakeibo-app-cache-v2';
 const DB_NAME = 'kakeiboDB';
 const DB_VERSION = 1;
 const STORE_NAMES = {
     ENTRIES: 'entries',
-    RECURRING_ENTRIES: 'recurringEntries', // fixedExpenses から recurringEntries に変更
+    RECURRING_ENTRIES: 'recurringEntries',
     BUDGETS: 'budgets'
 };
 const CATEGORY_OPTIONS = {
@@ -17,7 +17,6 @@ const CATEGORY_OPTIONS = {
     "給与", "副業", "お小遣い", "配当・投資", "賞与", "その他"
   ]
 };
-const NOTIFICATION_CHANNEL_ID = 'kakeibo-notifications';
 
 // DOM要素の取得
 const form = document.getElementById("expense-form");
@@ -35,14 +34,12 @@ const totalExpenseSpan = document.getElementById("totalExpense");
 const balanceSpan = document.getElementById("balance");
 const pieChartTab = document.getElementById("pieChartTab");
 const monthlyBarChartTab = document.getElementById("monthlyBarChartTab");
-// 新しいタブ
-const yearlyBarChartTab = document.getElementById("yearlyBarChartTab");   // 新しいタブ
+const yearlyBarChartTab = document.getElementById("yearlyBarChartTab");
 const myChartCanvas = document.getElementById("myChart");
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const csvFileInput = document.getElementById("csvFileInput");
 const importCsvBtn = document.getElementById("importCsvBtn");
 const monthPicker = document.getElementById("monthPicker");
-// 定期的な記録関連のDOM要素 (旧fixed-expense)
 const recurringTypeSelect = document.getElementById("recurringType");
 const recurringCategorySelect = document.getElementById("recurringCategory");
 const recurringAmountInput = document.getElementById("recurringAmount");
@@ -51,14 +48,12 @@ const recurringDayInput = document.getElementById("recurringDay");
 const addRecurringEntryBtn = document.getElementById("addRecurringEntryBtn");
 const recurringEntryList = document.getElementById("recurringEntryList");
 const addMonthlyRecurringEntriesBtn = document.getElementById("addMonthlyRecurringEntriesBtn");
-// 予算設定関連のDOM要素
 const budgetCategorySelect = document.getElementById("budgetCategorySelect");
 const budgetAmountInput = document.getElementById("budgetAmountInput");
 const setBudgetBtn = document.getElementById("setBudgetBtn");
 const budgetList = document.getElementById("budgetList");
 const budgetStatusDiv = document.getElementById("budgetStatus");
 const noBudgetSetMessage = document.getElementById("noBudgetSetMessage");
-// フィルタリング・検索関連のDOM要素
 const filterKeywordInput = document.getElementById("filterKeyword");
 const filterTypeSelect = document.getElementById("filterType");
 const filterCategorySelect = document.getElementById("filterCategory");
@@ -67,12 +62,20 @@ const filterAmountMaxInput = document.getElementById("filterAmountMax");
 const searchBtn = document.getElementById("searchBtn");
 const resetFilterBtn = document.getElementById("resetFilterBtn");
 const memoSuggestionsDatalist = document.getElementById("memo-suggestions");
+const dateInput = document.getElementById("date");
+
+// 新しいDOM要素
+const submitBtn = document.querySelector("#expense-form button[type='submit']");
+const cancelEditBtn = document.getElementById("cancelEditBtn");
+
 // グローバル変数
 let customCategories = new Set();
 let pastNotes = new Set();
 let currentMonth = new Date();
 let myChartInstance;
-let db; // IndexedDBインスタンス
+let db;
+let allEntries = [];
+let editingEntryId = null; // 編集中の項目IDを保持する変数
 
 // --- IndexedDB関連関数 ---
 async function openDB() {
@@ -89,12 +92,11 @@ async function openDB() {
                 entriesStore.createIndex('note', 'note', { unique: false });
                 entriesStore.createIndex('tags', 'tags', { unique: false });
             }
-            // 固定支出ストアの名前を recurringEntries に変更、dayIndex を追加
             if (!db.objectStoreNames.contains(STORE_NAMES.RECURRING_ENTRIES)) {
                 const recurringStore = db.createObjectStore(STORE_NAMES.RECURRING_ENTRIES, { keyPath: 'id', autoIncrement: true });
                 recurringStore.createIndex('type', 'type', { unique: false });
                 recurringStore.createIndex('category', 'category', { unique: false });
-                recurringStore.createIndex('day', 'day', { unique: false }); // 追加日用インデックス
+                recurringStore.createIndex('day', 'day', { unique: false });
             }
             if (!db.objectStoreNames.contains(STORE_NAMES.BUDGETS)) {
                 db.createObjectStore(STORE_NAMES.BUDGETS, { keyPath: 'category' });
@@ -120,11 +122,10 @@ async function saveData(storeName, data) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
-
+        
         const request = store.put(data);
 
         request.onsuccess = () => {
-            // console.log(`Data saved to IndexedDB (${storeName}):`, data);
             resolve();
         };
 
@@ -181,7 +182,7 @@ form.addEventListener("submit", async (e) => {
 
   const data = {
     type: typeSelect.value,
-    date: document.getElementById("date").value,
+    date: dateInput.value,
     category: categorySelect.value,
     amount: parseInt(amountInput.value, 10),
     note: noteInput.value,
@@ -192,21 +193,40 @@ form.addEventListener("submit", async (e) => {
     alert("種別、日付、カテゴリ、金額は必須入力です。金額は正の数値を入力してください。");
     return;
   }
-
-  if (data.category === "その他" && data.note) {
-      customCategories.add(data.note);
-  }
-  if (data.note) {
-      pastNotes.add(data.note);
-  }
-
-  await saveData(STORE_NAMES.ENTRIES, data);
-  await loadAndDisplayData();
-  form.reset();
   
-  updateCategoryOptions();
-  updateMemoSuggestions();
+  if (editingEntryId !== null) {
+      // 編集モード
+      data.id = editingEntryId;
+      await saveData(STORE_NAMES.ENTRIES, data);
+      alert("履歴が更新されました。");
+      editingEntryId = null;
+  } else {
+      // 新規追加モード
+      await saveData(STORE_NAMES.ENTRIES, data);
+      alert("履歴が追加されました。");
+  }
+
+  // フォームをリセット
+  form.reset();
+  dateInput.valueAsDate = new Date();
+  submitBtn.textContent = '追加';
+  cancelEditBtn.style.display = 'none';
+
+  await loadAllDataForSuggestions();
+  await loadAndDisplayData();
 });
+
+// キャンセルボタン
+cancelEditBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  editingEntryId = null;
+  form.reset();
+  dateInput.valueAsDate = new Date();
+  submitBtn.textContent = '追加';
+  cancelEditBtn.style.display = 'none';
+  updateCategoryOptions();
+});
+
 
 function updateCategoryOptions() {
   const type = typeSelect.value;
@@ -221,7 +241,6 @@ function updateCategoryOptions() {
   } else {
     categorySelect.innerHTML = '<option value="">まず種別を選んでください</option>';
   }
-  // カスタムカテゴリを追加
   Array.from(customCategories).sort().forEach(cat => {
     if (!CATEGORY_OPTIONS["支出"].includes(cat) && !CATEGORY_OPTIONS["収入"].includes(cat)) {
       const opt = document.createElement("option");
@@ -243,7 +262,6 @@ function updateRecurringCategoryOptions() {
       recurringCategorySelect.appendChild(opt);
     });
   }
-  // カスタムカテゴリも追加
   Array.from(customCategories).sort().forEach(cat => {
     if (type === '支出' && !CATEGORY_OPTIONS["支出"].includes(cat)) {
       const opt = document.createElement("option");
@@ -269,15 +287,13 @@ function updateMemoSuggestions() {
 }
 
 async function loadAllDataForSuggestions() {
-  const allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || [];
+  allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || [];
   customCategories.clear();
   pastNotes.clear();
   allEntries.forEach(item => {
-    // "その他"カテゴリでメモが使われていたらカスタムカテゴリとして記憶
     if (item.category === "その他" && item.note) {
       customCategories.add(item.note);
     } else if (!CATEGORY_OPTIONS["支出"].includes(item.category) && !CATEGORY_OPTIONS["収入"].includes(item.category)) {
-      // 定義済みカテゴリになく、メモがある場合もカスタムカテゴリとして記憶
       customCategories.add(item.category);
     }
     if (item.note) {
@@ -285,12 +301,12 @@ async function loadAllDataForSuggestions() {
     }
   });
   updateCategoryOptions();
-  updateRecurringCategoryOptions(); // 定期的な記録のカテゴリも更新
+  updateRecurringCategoryOptions();
   updateMemoSuggestions();
 }
 
 async function loadAndDisplayData() {
-  let allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || [];
+  allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || [];
   historyList.innerHTML = "";
   const filterKeyword = filterKeywordInput.value.toLowerCase();
   const filterType = filterTypeSelect.value;
@@ -307,21 +323,19 @@ async function loadAndDisplayData() {
   const currentMonthYear = currentMonth.getFullYear();
   const currentMonthMonth = currentMonth.getMonth();
   const monthlyData = filteredData.filter(item => {
-    const itemDate = new Date(item.date); // Dateオブジェクトのパースは 'YYYY-MM-DD' 形式を推奨
     const [year, month, day] = item.date.split('-').map(Number);
-    const itemParsedDate = new Date(year, month - 1, day); // 月は0始まり
+    const itemParsedDate = new Date(year, month - 1, day);
     return itemParsedDate.getFullYear() === currentMonthYear && itemParsedDate.getMonth() === currentMonthMonth;
   });
   monthlyData.sort((a, b) => {
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
     if (dateA.getTime() === dateB.getTime()) {
-      // 日付が同じ場合はタイプ（支出優先）と金額でソート
       if (a.type === "支出" && b.type === "収入") return -1;
       if (a.type === "収入" && b.type === "支出") return 1;
-      return b.amount - a.amount; // 金額降順
+      return b.amount - a.amount;
     }
-    return dateB - dateA; // 日付降順
+    return dateB - dateA;
   });
   const groupedData = {};
   monthlyData.forEach(item => {
@@ -351,6 +365,7 @@ async function loadAndDisplayData() {
         dailyItems.forEach((item) => {
           const li = document.createElement("li");
           li.className = item.type === "支出" ? "expense-item" : "income-item";
+          li.dataset.id = item.id;
           li.innerHTML = `
             <span class="item-details">
               <span class="item-type">${item.type}</span>
@@ -361,6 +376,14 @@ async function loadAndDisplayData() {
             </span>
             <button class="delete-btn" data-id="${item.id}" data-store="${STORE_NAMES.ENTRIES}">削除</button>
           `;
+          // 項目全体をクリック可能にする
+          li.addEventListener('click', (e) => {
+              if (e.target.classList.contains('delete-btn')) {
+                  e.stopPropagation();
+                  return;
+              }
+              editEntry(item);
+          });
           ul.appendChild(li);
         });
         historyList.appendChild(ul);
@@ -369,6 +392,7 @@ async function loadAndDisplayData() {
   }
   document.querySelectorAll('.delete-btn').forEach(button => {
     button.addEventListener('click', async (e) => {
+      e.stopPropagation(); // liへのイベント伝播を停止
       const idToDelete = parseInt(e.target.dataset.id, 10);
       const storeName = e.target.dataset.store;
       if (confirm("この項目を削除してもよろしいですか？")) {
@@ -380,9 +404,25 @@ async function loadAndDisplayData() {
   });
   updateMonthDisplay();
   updateSummary(monthlyData);
-  await updateCharts(); // await を追加
+  await updateCharts();
   updateBudgetStatus(monthlyData);
 }
+
+function editEntry(entry) {
+    editingEntryId = entry.id;
+    typeSelect.value = entry.type;
+    updateCategoryOptions();
+    categorySelect.value = entry.category;
+    dateInput.value = entry.date;
+    amountInput.value = entry.amount;
+    noteInput.value = entry.note;
+    tagsInput.value = entry.tags.join(', ');
+
+    submitBtn.textContent = '更新';
+    cancelEditBtn.style.display = 'inline-block';
+    document.getElementById("top").scrollIntoView({ behavior: 'smooth' });
+}
+
 
 function updateMonthDisplay() {
   const year = currentMonth.getFullYear();
@@ -432,21 +472,23 @@ async function updateCharts() {
     myChartInstance.destroy();
   }
   const activeTab = document.querySelector('.chart-tabs button.active').id;
-  const monthlyData = await filterAndSortMonthlyData(); // 月別データ取得
-  const allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || []; // 全データ取得
+  const monthlyData = allEntries.filter(item => {
+    const [year, month] = item.date.split('-').map(Number);
+    return year === currentMonth.getFullYear() && (month - 1) === currentMonth.getMonth();
+  });
+
   if (activeTab === 'pieChartTab') {
     renderPieChart(monthlyData);
   } else if (activeTab === 'monthlyBarChartTab') {
     renderMonthlyBarChart(allEntries);
   } else if (activeTab === 'yearlyBarChartTab') {
-    renderYearlyBarChart(allEntries); // 新しいグラフの描画
+    renderYearlyBarChart(allEntries);
   }
 }
 
 function renderPieChart(monthlyData) {
   const expenseByCategory = {};
   monthlyData.filter(item => item.type === "支出").forEach(item => {
-    // カスタムカテゴリを考慮
     const actualCategory = (item.category === "その他" && item.note && customCategories.has(item.note)) ? item.note : item.category;
     expenseByCategory[actualCategory] = (expenseByCategory[actualCategory] || 0) + item.amount;
   });
@@ -481,7 +523,7 @@ function renderPieChart(monthlyData) {
 function renderMonthlyBarChart(allEntries) {
     const monthlyTotals = {};
     allEntries.forEach(item => {
-        const month = item.date.substring(0, 7); // 'YYYY-MM'
+        const month = item.date.substring(0, 7);
         if (!monthlyTotals[month]) {
             monthlyTotals[month] = { income: 0, expense: 0 };
         }
@@ -545,7 +587,7 @@ function renderMonthlyBarChart(allEntries) {
 function renderYearlyBarChart(allEntries) {
     const yearlyTotals = {};
     allEntries.forEach(item => {
-        const year = item.date.substring(0, 4); // 'YYYY'
+        const year = item.date.substring(0, 4);
         if (!yearlyTotals[year]) {
             yearlyTotals[year] = { income: 0, expense: 0 };
         }
@@ -606,7 +648,6 @@ function renderYearlyBarChart(allEntries) {
     });
 }
 
-// グラフの色を動的に生成するヘルパー関数
 function generateColors(num) {
     const colors = [];
     const baseColors = [
@@ -677,11 +718,10 @@ async function updateBudgetStatus(monthlyData) {
         noBudgetSetMessage.style.display = 'block';
         return;
     }
-    
+
     noBudgetSetMessage.style.display = 'none';
     const totalExpenses = {};
     monthlyData.filter(item => item.type === '支出').forEach(item => {
-        // カスタムカテゴリを考慮
         const actualCategory = (item.category === "その他" && item.note && customCategories.has(item.note)) ? item.note : item.category;
         totalExpenses[actualCategory] = (totalExpenses[actualCategory] || 0) + item.amount;
     });
@@ -708,7 +748,6 @@ async function updateBudgetStatus(monthlyData) {
 
 // 定期的な記録機能のロジック
 async function setupRecurringEntriesSection() {
-    // 既存の定期的な記録をロードして表示
     const recurringEntries = await loadAllDataFromStore(STORE_NAMES.RECURRING_ENTRIES);
     recurringEntryList.innerHTML = '';
     if (recurringEntries.length > 0) {
@@ -737,7 +776,6 @@ addRecurringEntryBtn.addEventListener('click', async () => {
         await saveData(STORE_NAMES.RECURRING_ENTRIES, { type, category, amount, note, day });
         alert("定期的な記録を登録しました。");
         await setupRecurringEntriesSection();
-        // フォームをリセット
         recurringTypeSelect.value = '';
         recurringCategorySelect.value = '';
         recurringAmountInput.value = '';
@@ -803,9 +841,7 @@ exportCsvBtn.addEventListener('click', async () => {
     }
     const header = ["id", "type", "date", "category", "amount", "note", "tags"];
     const rows = allEntries.map(item => {
-        // tags配列をカンマ区切りの文字列に変換
         const tagsString = (item.tags && item.tags.length > 0) ? item.tags.join(',') : '';
-        // カンマを含む文字列を二重引用符で囲む処理
         const note = item.note ? `"${item.note.replace(/"/g, '""')}"` : '';
         return [item.id, item.type, item.date, item.category, item.amount, note, tagsString].join(',');
     });
@@ -832,11 +868,9 @@ csvFileInput.addEventListener('change', (event) => {
             const lines = text.split('\n');
             const dataToImport = [];
 
-            for (let i = 1; i < lines.length; i++) { // ヘッダー行をスキップ
+            for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (line === '') continue;
-
-                // CSVをパース（簡易的なもの）
                 const values = line.split(',');
                 if (values.length >= 6) {
                     const type = values[1].trim();
@@ -845,8 +879,6 @@ csvFileInput.addEventListener('change', (event) => {
                     const amount = parseInt(values[4].trim(), 10);
                     const note = values[5].trim().replace(/^"|"$/g, '').replace(/""/g, '"');
                     const tags = values[6] ? values[6].split(',').map(tag => tag.trim()) : [];
-
-                    // データのバリデーション
                     if (type && date && category && !isNaN(amount) && amount >= 0) {
                         dataToImport.push({ type, date, category, amount, note, tags });
                     }
@@ -854,7 +886,6 @@ csvFileInput.addEventListener('change', (event) => {
             }
 
             if (dataToImport.length > 0) {
-                // インポート前に確認
                 if (confirm(`${dataToImport.length}件のデータをインポートしますか？既存のデータは削除されず、追加されます。`)) {
                     for (const item of dataToImport) {
                         await saveData(STORE_NAMES.ENTRIES, item);
@@ -878,14 +909,40 @@ document.querySelectorAll('.footer-nav .nav-button').forEach(button => {
         const targetId = e.currentTarget.dataset.target;
         const targetElement = document.getElementById(targetId);
         if (targetElement) {
-            // ヘッダーの高さを考慮してスクロール位置を調整
-            const headerHeight = 60; // h2のpadding-topに合わせる
+            const headerHeight = 60;
             const elementPosition = targetElement.offsetTop;
             window.scrollTo({
                 top: elementPosition - headerHeight,
                 behavior: 'smooth'
             });
         }
+    });
+});
+
+
+// フィルタリング機能
+searchBtn.addEventListener('click', async () => {
+    await loadAndDisplayData();
+});
+
+resetFilterBtn.addEventListener('click', async () => {
+    filterKeywordInput.value = '';
+    filterTypeSelect.value = '';
+    filterCategorySelect.value = '';
+    filterAmountMinInput.value = '';
+    filterAmountMaxInput.value = '';
+    await loadAndDisplayData();
+});
+
+filterTypeSelect.addEventListener('change', () => {
+    const type = filterTypeSelect.value;
+    filterCategorySelect.innerHTML = '<option value="">すべて</option>';
+    const categories = type ? CATEGORY_OPTIONS[type].concat(type === '支出' ? Array.from(customCategories) : []) : Object.values(CATEGORY_OPTIONS).flat().concat(Array.from(customCategories));
+    categories.sort().forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        filterCategorySelect.appendChild(opt);
     });
 });
 
