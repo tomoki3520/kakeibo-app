@@ -297,40 +297,38 @@ async function loadAndDisplayData() {
 }
 
 // 履歴の表示
-async function displayData(data) {
+function displayHistory(entries) {
     historyList.innerHTML = '';
-    const totalIncome = data.filter(item => item.type === '収入').reduce((sum, item) => sum + item.amount, 0);
-    const totalExpense = data.filter(item => item.type === '支出').reduce((sum, item) => sum + item.amount, 0);
+    if (entries.length === 0) {
+        historyList.innerHTML = '<li class="no-data">この月のデータはありません。</li>';
+        return;
+    }
 
-    totalIncomeSpan.textContent = totalIncome.toLocaleString();
-    totalExpenseSpan.textContent = totalExpense.toLocaleString();
-    balanceSpan.textContent = (totalIncome - totalExpense).toLocaleString();
-
-    for (const item of data) {
+    entries.forEach(entry => {
         const li = document.createElement('li');
-        li.className = `history-item ${item.type === '支出' ? 'expense' : 'income'}`;
-        li.dataset.id = item.id;
-        
-        const date = new Date(item.date).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
-        
+        li.classList.add('history-item', entry.type === '支出' ? 'expense' : 'income');
+        const formattedTags = entry.tags ? entry.tags.split(',').map(tag => `<span class="tag">${tag.trim()}</span>`).join('') : '';
+
         li.innerHTML = `
-            <div class="item-left">
-                <div class="item-details">
-                    <div class="item-category">${item.category}</div>
-                    <div class="item-note">${item.note || 'メモなし'}</div>
+            <div class="item-header">
+                <span class="item-date">${entry.date}</span>
+                <span class="item-category">${entry.category}</span>
+                <span class="item-type">${entry.type}</span>
+            </div>
+            <div class="item-body">
+                <span class="item-note">${entry.note}</span>
+                <span class="item-amount">${entry.amount.toLocaleString()} 円</span>
+            </div>
+            <div class="item-footer">
+                <div class="item-tags">${formattedTags}</div>
+                <div class="item-actions">
+                    <button class="edit-btn" data-id="${entry.id}">編集</button>
+                    <button class="delete-btn" data-id="${entry.id}">削除</button>
                 </div>
-            </div>
-            <div class="item-right">
-                <div class="item-amount">${item.amount.toLocaleString()}</div>
-                <div class="item-date">${date}</div>
-            </div>
-            <div class="item-actions">
-                <button class="edit-btn" data-id="${item.id}" aria-label="編集"><i class="material-icons">edit</i></button>
-                <button class="delete-btn" data-id="${item.id}" aria-label="削除"><i class="material-icons">delete</i></button>
             </div>
         `;
         historyList.appendChild(li);
-    }
+    });
 }
 
 // 集計の更新
@@ -1007,4 +1005,3 @@ async function init() {
 }
 
 init();
-
