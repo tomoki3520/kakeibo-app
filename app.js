@@ -779,7 +779,7 @@ async function setupRecurringEntriesSection() {
         const li = document.createElement('li');
         li.innerHTML = `
             <span>${entry.type} - ${entry.category}: ¥${entry.amount.toLocaleString()} (${entry.note}) | 毎月${entry.day}日</span>
-            <button class="delete-recurring-btn" data-id="${entry.id}">削除</button>
+            <button class="delete-btn" data-id="${entry.id}">削除</button>
         `;
         recurringEntryList.appendChild(li);
     });
@@ -807,9 +807,9 @@ addRecurringEntryBtn.addEventListener('click', async () => {
     recurringDayInput.value = '';
 });
 
-// このイベントリスナーのクラス名を 'delete-recurring-btn' に修正しました
+// リスト内の削除ボタンがクリックされたときの処理
 recurringEntryList.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('delete-recurring-btn')) {
+    if (e.target.classList.contains('delete-btn')) {
         const idToDelete = parseInt(e.target.dataset.id, 10);
         if (confirm("この定期的な記録を削除してもよろしいですか？")) {
             await deleteDataFromStore(STORE_NAMES.RECURRING_ENTRIES, idToDelete);
@@ -1002,3 +1002,4 @@ async function init() {
 }
 
 init();
+
