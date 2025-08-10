@@ -779,7 +779,7 @@ async function setupRecurringEntriesSection() {
         const li = document.createElement('li');
         li.innerHTML = `
             <span>${entry.type} - ${entry.category}: ¥${entry.amount.toLocaleString()} (${entry.note}) | 毎月${entry.day}日</span>
-            <button class="delete-btn" data-id="${entry.id}">削除</button>
+            <button class="delete-recurring-btn" data-id="${entry.id}">削除</button>
         `;
         recurringEntryList.appendChild(li);
     });
@@ -793,23 +793,26 @@ addRecurringEntryBtn.addEventListener('click', async () => {
     const day = parseInt(recurringDayInput.value, 10);
 
     if (isNaN(amount) || amount <= 0 || !type || !category || isNaN(day) || day < 1 || day > 31) {
-        alert("種別、カテゴリ、正の金額、1〜31の追加日を入力してください。");
+        alert("種別、カテゴリ、正の金額、1〜31の追加日を正しく入力してください。");
         return;
     }
 
     const entry = { type, category, amount, note, day };
     await addData(STORE_NAMES.RECURRING_ENTRIES, entry);
-    await setupRecurringEntriesSection();
+    
+    // フォームをリセット
     recurringTypeSelect.value = '';
     recurringCategorySelect.innerHTML = '<option value="">選択してください</option>';
     recurringAmountInput.value = '';
     recurringNoteInput.value = '';
     recurringDayInput.value = '';
+
+    // リストを更新
+    await setupRecurringEntriesSection();
 });
 
-// リスト内の削除ボタンがクリックされたときの処理
 recurringEntryList.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('delete-btn')) {
+    if (e.target.classList.contains('delete-recurring-btn')) {
         const idToDelete = parseInt(e.target.dataset.id, 10);
         if (confirm("この定期的な記録を削除してもよろしいですか？")) {
             await deleteDataFromStore(STORE_NAMES.RECURRING_ENTRIES, idToDelete);
@@ -1002,4 +1005,5 @@ async function init() {
 }
 
 init();
+
 
