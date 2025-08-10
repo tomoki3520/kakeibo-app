@@ -508,43 +508,42 @@ color: green;
 }
 
 .month-navigation {
-/* 既存のスタイル */
 margin-bottom: 20px;
 }
 
 .filter-section {
-background-color: #fff;
-padding: 15px;
-border-radius: 5px;
-box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-margin-bottom: 20px;
+background-color: #f8f8f8; /* より薄い背景色 /
+padding: 20px; / 少し大きめのパディング /
+border-radius: 8px; / より丸みを帯びた角 /
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); / より弱い影 /
+margin-bottom: 30px; / 下の余白を大きく /
 display: grid;
-grid-template-columns: auto 1fr auto 1fr auto; /* 複数列のレイアウト */
-gap: 10px;
+grid-template-columns: auto 1fr auto 1fr auto;
+gap: 15px 10px; / 行と列のギャップを調整 */
 align-items: center;
 }
 
 .filter-section label {
-font-size: 0.9em;
+font-size: 0.95em; /* 少し大きく /
+color: #555; / 少し濃いめの文字色 */
 }
 
 .filter-section input,
 .filter-section select {
-padding: 8px;
+padding: 10px; /* 少し大きめのパディング /
 border: 1px solid #ccc;
-border-radius: 3px;
+border-radius: 4px; / 少し丸みを帯びた角 */
+font-size: 0.9em;
 }
 
 .filter-section button {
-padding: 10px 15px;
-border: none;
-border-radius: 3px;
-color: white;
-background-color: #007bff;
-cursor: pointer;
+padding: 12px 18px; /* 少し大きめのパディング */
+font-size: 0.9em;
 }
 
-.filter-section button:hover {
-background-color: #0056b3;
+/* 必要に応じて、レスポンシブ対応のためメディアクエリを追加することも検討します */
+@media (max-width: 768px) {
+.filter-section {
+grid-template-columns: 1fr; /* 画面が狭い場合は縦一列に */
 }
-
+}
