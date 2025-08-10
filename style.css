@@ -547,3 +547,25 @@ font-size: 0.9em;
 grid-template-columns: 1fr; /* 画面が狭い場合は縦一列に */
 }
 }
+
+.delete-btn {
+background-color: #ffe0e0; /* 薄い赤 /
+color: #ff5252; / 濃い赤 */
+border: 1px solid #ffcdd2;
+}
+
+.delete-btn:hover {
+background-color: #ffcdd2;
+color: #ff5252;
+}
+
+.edit-btn {
+background-color: #e0f7fa; /* 薄い水色 /
+color: #00bcd4; / 濃い水色 */
+border: 1px solid #b2ebf2;
+}
+
+.edit-btn:hover {
+background-color: #b2ebf2;
+color: #00bcd4;
+}
