@@ -832,76 +832,92 @@ addMonthlyRecurringEntriesBtn.addEventListener('click', async () => {
     }
 });
 
-// CSVインポート/エクスポート機能
+// CSVエクスポート機能
 exportCsvBtn.addEventListener('click', async () => {
-    const allEntries = await loadAllDataFromStore(STORE_NAMES.ENTRIES) || [];
-    if (allEntries.length === 0) {
-        alert("エクスポートするデータがありません。");
-        return;
-    }
-    const header = ["id", "type", "date", "category", "amount", "note", "tags"];
-    const rows = allEntries.map(item => {
-        const tagsString = (item.tags && item.tags.length > 0) ? item.tags.join(',') : '';
-        const note = item.note ? `"${item.note.replace(/"/g, '""')}"` : '';
-        return [item.id, item.type, item.date, item.category, item.amount, note, tagsString].join(',');
+    const allEntries = await getAllData(STORE_NAMES.ENTRIES);
+    let csv = "ID,種別,日付,カテゴリ,金額,メモ,タグ\n";
+    allEntries.forEach(entry => {
+        csv += `${entry.id},"${entry.type}","${entry.date}","${entry.category}",${entry.amount},"${entry.note}","${entry.tags}"\n`;
     });
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + header.join(',') + "\n" + rows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "kakeibo_data.csv");
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `kakeibo_data_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    alert('CSVデータがエクスポートされました。');
 });
 
+// CSVインポート機能
 importCsvBtn.addEventListener('click', () => {
-    csvFileInput.click();
-});
-
-csvFileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const text = e.target.result;
-            const lines = text.split('\n');
-            const dataToImport = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line === '') continue;
-                const values = line.split(',');
-                if (values.length >= 6) {
-                    const type = values[1].trim();
-                    const date = values[2].trim();
-                    const category = values[3].trim();
-                    const amount = parseInt(values[4].trim(), 10);
-                    const note = values[5].trim().replace(/^"|"$/g, '').replace(/""/g, '"');
-                    const tags = values[6] ? values[6].split(',').map(tag => tag.trim()) : [];
-                    if (type && date && category && !isNaN(amount) && amount >= 0) {
-                        dataToImport.push({ type, date, category, amount, note, tags });
-                    }
-                }
-            }
-
-            if (dataToImport.length > 0) {
-                if (confirm(`${dataToImport.length}件のデータをインポートしますか？既存のデータは削除されず、追加されます。`)) {
-                    for (const item of dataToImport) {
-                        await saveData(STORE_NAMES.ENTRIES, item);
-                    }
-                    alert(`${dataToImport.length}件のデータをインポートしました。`);
-                    await loadAllDataForSuggestions();
-                    await loadAndDisplayData();
-                }
-            } else {
-                alert("インポートできる有効なデータが見つかりませんでした。");
-            }
-        };
-        reader.readAsText(file);
+    const file = csvFileInput.files[0];
+    if (!file) {
+        alert('CSVファイルを選択してください。');
+        return;
     }
-});
 
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        const header = lines[0].split(',').map(h => h.trim());
+
+        if (!header.includes('種別') || !header.includes('日付') || !header.includes('カテゴリ') || !header.includes('金額')) {
+            alert('CSVヘッダーに「種別」「日付」「カテゴリ」「金額」がありません。正しいフォーマットのファイルを選択してください。');
+            return;
+        }
+
+        const entriesToImport = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line === '') continue;
+
+            const values = line.match(/(?:[^,"]+|"[^"]*")+/g).map(val => val.replace(/"/g, '').trim());
+            const entry = {};
+            header.forEach((h, index) => {
+                const value = values[index];
+                if (h === 'ID' || h === 'id') return; // IDはインポートしない
+                if (h === '金額' || h === 'amount') {
+                    entry.amount = parseInt(value, 10);
+                } else if (h === 'タグ' || h === 'tags') {
+                    entry.tags = value;
+                } else if (h === 'メモ' || h === 'note') {
+                    entry.note = value;
+                } else if (h === '日付' || h === 'date') {
+                    entry.date = value;
+                } else if (h === '種別' || h === 'type') {
+                    entry.type = value;
+                } else if (h === 'カテゴリ' || h === 'category') {
+                    entry.category = value;
+                }
+            });
+            if (entry.type && entry.date && entry.category && entry.amount) {
+                entriesToImport.push(entry);
+            }
+        }
+        
+        // 既存データをクリアするか確認
+        if (confirm(`CSVから ${entriesToImport.length} 件のデータをインポートします。既存のデータをすべて削除して置き換えますか？\n「キャンセル」を選択した場合、データが追加されます。`)) {
+            await clearStore(STORE_NAMES.ENTRIES);
+            console.log("Existing data cleared.");
+        }
+
+        for (const entry of entriesToImport) {
+            await addData(STORE_NAMES.ENTRIES, entry);
+        }
+
+        alert(`${entriesToImport.length}件のデータを正常にインポートしました。`);
+        csvFileInput.value = '';
+        await loadAllDataForSuggestions();
+        await loadAndDisplayData();
+    };
+
+    reader.readAsText(file);
+});
 
 // フッターナビゲーション
 document.querySelectorAll('.footer-nav .nav-button').forEach(button => {
@@ -960,3 +976,4 @@ async function init() {
 }
 
 window.addEventListener('load', init);
+
