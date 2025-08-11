@@ -1,27 +1,26 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>家計簿アプリ</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="style.css">
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <!-- PWA設定 -->
   <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#28a745">
+  <meta name="mobile-web-app-capable" content="yes">
 
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="家計簿">
+  <!-- アイコン設定 -->
+  <link rel="icon" href="/icon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" href="/icon-192x192.png">
 
+  <!-- スタイル＆ライブラリ -->
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-  <link rel="icon" type="image/png" href="/icon-192x192.png" sizes="192x192">
-  <link rel="icon" type="image/png" href="/icon-512x512.png" sizes="512x512">
-
+  <title>家計簿アプリ</title>
 </head>
+
 <body>
   <h1 id="top">家計簿</h1>
   <form id="expense-form">
@@ -212,3 +211,4 @@
 
 </body>
 </html>
+
