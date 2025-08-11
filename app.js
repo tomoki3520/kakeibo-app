@@ -832,14 +832,16 @@ addMonthlyRecurringEntriesBtn.addEventListener('click', async () => {
     }
 });
 
-// CSVエクスポート機能
+// --- CSVエクスポート機能 ---
 exportCsvBtn.addEventListener('click', async () => {
     const allEntries = await getAllData(STORE_NAMES.ENTRIES);
     let csv = "ID,種別,日付,カテゴリ,金額,メモ,タグ\n";
     allEntries.forEach(entry => {
-        csv += `${entry.id},"${entry.type}","${entry.date}","${entry.category}",${entry.amount},"${entry.note}","${entry.tags}"\n`;
+        // タグが配列の場合はカンマ区切りの文字列に変換するなど調整が必要
+        const tagsString = Array.isArray(entry.tags) ? entry.tags.join(",") : (entry.tags || "");
+        csv += `${entry.id},"${entry.type}","${entry.date}","${entry.category}",${entry.amount},"${entry.note || ""}","${tagsString}"\n`;
     });
-    
+
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -852,7 +854,7 @@ exportCsvBtn.addEventListener('click', async () => {
     alert('CSVデータがエクスポートされました。');
 });
 
-// CSVインポート機能
+// --- CSVインポート機能 ---
 importCsvBtn.addEventListener('click', () => {
     const file = csvFileInput.files[0];
     if (!file) {
@@ -863,7 +865,7 @@ importCsvBtn.addEventListener('click', () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
         const text = e.target.result;
-        const lines = text.split('\n');
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
         const header = lines[0].split(',').map(h => h.trim());
 
         if (!header.includes('種別') || !header.includes('日付') || !header.includes('カテゴリ') || !header.includes('金額')) {
@@ -873,10 +875,7 @@ importCsvBtn.addEventListener('click', () => {
 
         const entriesToImport = [];
         for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line === '') continue;
-
-            const values = line.match(/(?:[^,"]+|"[^"]*")+/g).map(val => val.replace(/"/g, '').trim());
+            const values = lines[i].match(/(?:[^,"]+|"[^"]*")+/g).map(val => val.replace(/"/g, '').trim());
             const entry = {};
             header.forEach((h, index) => {
                 const value = values[index];
@@ -884,7 +883,8 @@ importCsvBtn.addEventListener('click', () => {
                 if (h === '金額' || h === 'amount') {
                     entry.amount = parseInt(value, 10);
                 } else if (h === 'タグ' || h === 'tags') {
-                    entry.tags = value;
+                    // 複数タグがカンマ区切りなら配列に変換も可（必要に応じて）
+                    entry.tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
                 } else if (h === 'メモ' || h === 'note') {
                     entry.note = value;
                 } else if (h === '日付' || h === 'date') {
@@ -895,15 +895,18 @@ importCsvBtn.addEventListener('click', () => {
                     entry.category = value;
                 }
             });
-            if (entry.type && entry.date && entry.category && entry.amount) {
+            if (entry.type && entry.date && entry.category && !isNaN(entry.amount)) {
                 entriesToImport.push(entry);
             }
         }
-        
-        // 既存データをクリアするか確認
+
+        if (entriesToImport.length === 0) {
+            alert("有効なデータが見つかりませんでした。");
+            return;
+        }
+
         if (confirm(`CSVから ${entriesToImport.length} 件のデータをインポートします。既存のデータをすべて削除して置き換えますか？\n「キャンセル」を選択した場合、データが追加されます。`)) {
             await clearStore(STORE_NAMES.ENTRIES);
-            console.log("Existing data cleared.");
         }
 
         for (const entry of entriesToImport) {
@@ -976,4 +979,5 @@ async function init() {
 }
 
 window.addEventListener('load', init);
+
 
