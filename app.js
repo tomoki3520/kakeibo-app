@@ -254,7 +254,6 @@ function updateCategoryOptions() {
 typeSelect.addEventListener('change', updateCategoryOptions);
 recurringTypeSelect.addEventListener('change', updateCategoryOptions);
 
-
 // メインのデータ表示機能
 async function loadAndDisplayData() {
     const allEntries = await getAllData(STORE_NAMES.ENTRIES);
@@ -316,7 +315,7 @@ function displayHistory(entries) {
     entries.forEach(entry => {
         const li = document.createElement('li');
         li.classList.add('history-item', entry.type === '支出' ? 'expense' : 'income');
-        const formattedTags = entry.tags ? entry.tags.split(',').map(tag => `<span class="tag">${tag.trim()}</span>`).join('') : '';
+        const formattedTags = entry.tags ? entry.tags.split(',').map(tag => '<span class="tag">' + tag.trim() + '</span>').join('') : '';
 
         li.innerHTML = `
             <div class="item-header">
@@ -353,15 +352,15 @@ function updateSummary(entries) {
         }
     });
 
-    totalIncomeSpan.textContent = `¥${totalIncome.toLocaleString()}`;
-    totalExpenseSpan.textContent = `¥${totalExpense.toLocaleString()}`;
-    balanceSpan.textContent = `¥${(totalIncome - totalExpense).toLocaleString()}`;
+    totalIncomeSpan.textContent = '¥' + totalIncome.toLocaleString();
+    totalExpenseSpan.textContent = '¥' + totalExpense.toLocaleString();
+    balanceSpan.textContent = '¥' + (totalIncome - totalExpense).toLocaleString();
 
     updateBudgetStatus(totalExpense);
 }
 
 function updateBudgetStatus(currentExpense) {
-    const currentMonthKey = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}`;
+    const currentMonthKey = currentMonth.getFullYear() + '-' + String(currentMonth.getMonth() + 1).padStart(2, '0');
     let isBudgetSet = false;
     let budgetHtml = '<h3>今月の予算実績</h3>';
     getAllData(STORE_NAMES.BUDGETS).then(budgets => {
@@ -427,7 +426,7 @@ function updateBudgetStatus(currentExpense) {
             budgetStatusDiv.innerHTML = budgetHtml;
         } else {
             noBudgetSetMessage.style.display = 'block';
-            budgetStatusDiv.innerHTML = `<h3>今月の予算実績</h3>`;
+            budgetStatusDiv.innerHTML = '<h3>今月の予算実績</h3>';
             budgetStatusDiv.appendChild(noBudgetSetMessage);
         }
     });
@@ -468,21 +467,16 @@ function renderPieChart(entries) {
                     '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
                     '#5D6D7E', '#48C9B0', '#F4D03F', '#D35400', '#2E86C1', '#229954',
                     '#8E44AD'
-                ],
+                ]
             }]
         },
         options: {
             responsive: true,
             plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: true,
-                    text: 'カテゴリ別支出'
-                }
+                legend: { position: 'top' },
+                title: { display: true, text: 'カテゴリ別支出' }
             }
-        },
+        }
     });
 }
 
@@ -515,12 +509,12 @@ async function renderMonthlyBarChart() {
                 {
                     label: '収入',
                     data: incomeData,
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
                 },
                 {
                     label: '支出',
                     data: expenseData,
-                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
                 }
             ]
         },
@@ -529,24 +523,15 @@ async function renderMonthlyBarChart() {
             scales: {
                 x: {
                     stacked: false,
-                    title: {
-                        display: true,
-                        text: '月'
-                    }
+                    title: { display: true, text: '月' }
                 },
                 y: {
                     stacked: false,
-                    title: {
-                        display: true,
-                        text: '金額 (円)'
-                    }
+                    title: { display: true, text: '金額 (円)' }
                 }
             },
             plugins: {
-                title: {
-                    display: true,
-                    text: '月別収支推移'
-                }
+                title: { display: true, text: '月別収支推移' }
             }
         }
     });
@@ -581,12 +566,12 @@ async function renderYearlyBarChart() {
                 {
                     label: '収入',
                     data: incomeData,
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
                 },
                 {
                     label: '支出',
                     data: expenseData,
-                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
                 }
             ]
         },
@@ -595,24 +580,15 @@ async function renderYearlyBarChart() {
             scales: {
                 x: {
                     stacked: false,
-                    title: {
-                        display: true,
-                        text: '年'
-                    }
+                    title: { display: true, text: '年' }
                 },
                 y: {
                     stacked: false,
-                    title: {
-                        display: true,
-                        text: '金額 (円)'
-                    }
+                    title: { display: true, text: '金額 (円)' }
                 }
             },
             plugins: {
-                title: {
-                    display: true,
-                    text: '年別収支推移'
-                }
+                title: { display: true, text: '年別収支推移' }
             }
         }
     });
@@ -687,7 +663,6 @@ document.getElementById("cancelEditBtn").addEventListener('click', () => {
     document.getElementById("cancelEditBtn").style.display = 'none';
     updateCategoryOptions();
 });
-
 
 prevMonthBtn.addEventListener('click', () => {
     currentMonth.setMonth(currentMonth.getMonth() - 1);
@@ -765,7 +740,7 @@ setBudgetBtn.addEventListener('click', async () => {
     budgetCategorySelect.value = '';
     budgetAmountInput.value = '';
     await setupBudgetSection();
-    await loadAndDisplayData(); // 予算ステータスを更新
+    await loadAndDisplayData();
 });
 
 budgetList.addEventListener('click', async (e) => {
@@ -774,11 +749,10 @@ budgetList.addEventListener('click', async (e) => {
         if (confirm(`${categoryToDelete}の予算を削除してもよろしいですか？`)) {
             await deleteDataFromStore(STORE_NAMES.BUDGETS, categoryToDelete);
             await setupBudgetSection();
-            await loadAndDisplayData(); // 予算ステータスを更新
+            await loadAndDisplayData();
         }
     }
 });
-
 
 // 定期的な記録機能のロジック
 async function setupRecurringEntriesSection() {
@@ -797,16 +771,16 @@ async function setupRecurringEntriesSection() {
 addRecurringEntryBtn.addEventListener('click', async () => {
     const type = recurringTypeSelect.value;
     const category = recurringCategorySelect.value;
-    const amount = parseInt(recurringAmountInput.value, 10);
+    theAmount = parseInt(recurringAmountInput.value, 10);
     const note = recurringNoteInput.value.trim();
     const day = parseInt(recurringDayInput.value, 10);
 
-    if (isNaN(amount) || amount <= 0 || !type || !category || isNaN(day) || day < 1 || day > 31) {
+    if (isNaN(theAmount) || theAmount <= 0 || !type || !category || isNaN(day) || day < 1 || day > 31) {
         alert("種別、カテゴリ、正の金額、1〜31の追加日を正しく入力してください。");
         return;
     }
 
-    const entry = { type, category, amount, note, day };
+    const entry = { type, category, amount: theAmount, note, day };
     await addData(STORE_NAMES.RECURRING_ENTRIES, entry);
     
     // フォームをリセット
@@ -830,6 +804,7 @@ recurringEntryList.addEventListener('click', async (e) => {
     }
 });
 
+// 今月へ追加（同日・同内容のみ重複スキップ、存在しない日はスキップ）
 addMonthlyRecurringEntriesBtn.addEventListener('click', async () => {
     const recurringEntries = await getAllData(STORE_NAMES.RECURRING_ENTRIES);
     if (recurringEntries.length === 0) {
@@ -838,34 +813,65 @@ addMonthlyRecurringEntriesBtn.addEventListener('click', async () => {
     }
     
     const allEntries = await getAllData(STORE_NAMES.ENTRIES);
-    const addedDates = new Set(allEntries.map(e => e.date));
 
     const today = new Date();
-    const currentMonthStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
-    let addedCount = 0;
+    const y = today.getFullYear();
+    const m = today.getMonth(); // 0始まり
+    const currentMonthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const dim = new Date(y, m + 1, 0).getDate(); // その月の最終日
 
-    for (const entry of recurringEntries) {
-        const entryDate = `${currentMonthStr}-${entry.day.toString().padStart(2, '0')}`;
-        if (!addedDates.has(entryDate)) {
-            const newEntry = {
-                type: entry.type,
-                date: entryDate,
-                category: entry.category,
-                amount: entry.amount,
-                note: `[定期] ${entry.note}`,
-                tags: `定期`
-            };
-            await addData(STORE_NAMES.ENTRIES, newEntry);
-            addedCount++;
+    let addedCount = 0;
+    let skippedDup = 0;
+    let skippedInvalid = 0;
+
+    for (const r of recurringEntries) {
+        // この月に存在しない日付はスキップ
+        if (!Number.isInteger(r.day) || r.day < 1 || r.day > dim) {
+            skippedInvalid++;
+            continue;
         }
+
+        const entryDate = `${currentMonthStr}-${String(r.day).padStart(2, '0')}`;
+        const newNote = `[定期] ${r.note || ''}`.trim();
+        const newTags = '定期';
+
+        // 重複判定は「同日・同内容」
+        const isDup = allEntries.some(e =>
+            e.date === entryDate &&
+            e.type === r.type &&
+            e.category === r.category &&
+            e.amount === r.amount &&
+            (e.note || '') === newNote &&
+            (e.tags || '') === newTags
+        );
+        if (isDup) {
+            skippedDup++;
+            continue;
+        }
+
+        const newEntry = {
+            type: r.type,
+            date: entryDate,
+            category: r.category,
+            amount: r.amount,
+            note: newNote,
+            tags: newTags
+        };
+        await addData(STORE_NAMES.ENTRIES, newEntry);
+        // 同一ボタン押下内の後続判定用に即時反映
+        allEntries.push(newEntry);
+        addedCount++;
     }
     
     if (addedCount > 0) {
-        alert(`${addedCount}件の定期的な記録を今月に追加しました。`);
+        alert(`${addedCount}件の定期的な記録を今月に追加しました。${skippedDup ? `（重複 ${skippedDup}件スキップ）` : ''}${skippedInvalid ? `（存在しない日付 ${skippedInvalid}件スキップ）` : ''}`);
         await loadAllDataForSuggestions();
         await loadAndDisplayData();
     } else {
-        alert('今月は追加できる定期的な記録がありませんでした。既に記録済みか、日付が不正な可能性があります。');
+        const reason = skippedDup || skippedInvalid
+            ? `${skippedDup ? `重複 ${skippedDup}件` : ''}${skippedDup && skippedInvalid ? '・' : ''}${skippedInvalid ? `存在しない日付 ${skippedInvalid}件` : ''}`
+            : '対象がありませんでした';
+        alert(`今月は追加できる定期的な記録がありませんでした。${reason}。`);
     }
 });
 
@@ -956,7 +962,6 @@ importCsvBtn.addEventListener('click', () => {
     reader.readAsText(file);
 });
 
-
 // スクロールナビゲーション
 const headerHeight = document.querySelector('h1').offsetHeight;
 navButtons.forEach(button => {
@@ -972,7 +977,6 @@ navButtons.forEach(button => {
         }
     });
 });
-
 
 // フィルタリング機能
 searchBtn.addEventListener('click', async () => {
@@ -991,7 +995,9 @@ resetFilterBtn.addEventListener('click', async () => {
 filterTypeSelect.addEventListener('change', () => {
     const type = filterTypeSelect.value;
     filterCategorySelect.innerHTML = '<option value="">すべて</option>';
-    const categories = type ? CATEGORY_OPTIONS[type].concat(type === '支出' ? Array.from(customCategories) : []) : Object.values(CATEGORY_OPTIONS).flat().concat(Array.from(customCategories));
+    const categories = type
+        ? CATEGORY_OPTIONS[type].concat(type === '支出' ? Array.from(customCategories) : [])
+        : Object.values(CATEGORY_OPTIONS).flat().concat(Array.from(customCategories));
     categories.sort().forEach(cat => {
         const opt = document.createElement("option");
         opt.value = cat;
@@ -999,7 +1005,6 @@ filterTypeSelect.addEventListener('change', () => {
         filterCategorySelect.appendChild(opt);
     });
 });
-
 
 // アプリの初期化
 async function init() {
@@ -1014,4 +1019,3 @@ async function init() {
 }
 
 init();
-
